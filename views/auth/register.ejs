@@ -1,0 +1,11 @@
+<%- include('../shared/header') %>
+<h1>Create Account</h1>
+<% if (errors && errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
+<form method="POST" action="/auth/register" class="form">
+  <label>Email* <input type="email" name="email" value="<%= (values&&values.email)||'' %>" required></label>
+  <label>Password* <input type="password" name="password" required></label>
+  <label>First name <input name="firstName" value="<%= (values&&values.firstName)||'' %>"></label>
+  <label>Last name <input name="lastName" value="<%= (values&&values.lastName)||'' %>"></label>
+  <button type="submit">Register</button>
+</form>
+<%- include('../shared/footer') %>

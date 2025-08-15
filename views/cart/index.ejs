@@ -1,0 +1,29 @@
+<%- include('../shared/header') %>
+<h1>Your Cart</h1>
+<% if (!cart.items.length) { %>
+  <p>Cart is empty.</p>
+<% } else { %>
+<table>
+  <thead><tr><th>Item</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
+  <tbody>
+  <% cart.items.forEach(i => { %>
+    <tr>
+      <td><%= i.title %> (<%= i.sku %>)</td>
+      <td>₺ <%= i.unitPrice.toFixed(2) %></td>
+      <td>
+        <form method="POST" action="/cart/update">
+          <input type="hidden" name="id" value="<%= i.productId %>">
+          <input type="number" name="qty" min="0" value="<%= i.qty %>" style="width:60px">
+          <button type="submit">Update</button>
+        </form>
+      </td>
+      <td>₺ <%= (i.qty*i.unitPrice).toFixed(2) %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+<p><strong>Subtotal:</strong> ₺ <%= cart.subtotal.toFixed(2) %></p>
+<form method="POST" action="/cart/clear"><button type="submit">Clear Cart</button></form>
+<p><a href="/checkout">Proceed to Checkout</a></p>
+<% } %>
+<%- include('../shared/footer') %>

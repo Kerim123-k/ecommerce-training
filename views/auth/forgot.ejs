@@ -1,0 +1,17 @@
+<%- include('../shared/header') %>
+<h1>Forgot Password</h1>
+
+<% if (errors && errors.length) { %>
+  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+<% } %>
+
+<% if (ok) { %>
+  <p>We’ve sent a reset link if the email exists. (In this demo, check the server console for the link.)</p>
+<% } %>
+
+<form method="POST" action="/auth/forgot" class="form">
+  <label>Email <input type="email" name="email" value="<%= (values && values.email) || '' %>" required></label>
+  <button type="submit">Send reset link</button>
+</form>
+<%- include('../shared/footer') %>
+

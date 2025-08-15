@@ -1,0 +1,48 @@
+<%- include('../shared/header') %>
+<h1>Edit Product</h1>
+
+<form method="POST" action="/admin/products/<%= product._id %>/edit" class="form">
+  <label>Title* <input name="title" value="<%= product.title %>" required></label>
+  <label>SKU* <input name="sku" value="<%= product.sku %>" required></label>
+  <label>Price* <input type="number" step="0.01" min="0" name="price" value="<%= product.price %>" required></label>
+  <label>Stock* <input type="number" min="0" name="stockQty" value="<%= product.stockQty %>" required></label>
+  <label>Status
+    <select name="status">
+      <option <%= product.status==='Draft'?'selected':'' %>>Draft</option>
+      <option <%= product.status==='Active'?'selected':'' %>>Active</option>
+    </select>
+  </label>
+  <label>Category
+    <select name="categories" multiple>
+      <% cats.forEach(c => { %>
+        <option value="<%= c._id %>" <%= product.categories.some(id => id.toString() === c._id.toString()) ? 'selected' : '' %>><%= c.name %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label>Image URL <input name="image" value="<%= product.images && product.images[0] ? product.images[0] : '' %>"></label>
+  <button type="submit">Save changes</button>
+</form>
+
+<form method="POST" action="/admin/products/<%= product._id %>/delete" onsubmit="return confirm('Delete this product?')">
+  <button type="submit">Delete</button>
+</form>
+
+<%- include('../shared/footer') %>
+
+
+
+<% if (errors && errors.length) { %>
+  <div class="alert-error">
+    <ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul>
+  </div>
+<% } %>
+
+<!-- examples for inputs -->
+<input name="title" value="<%= (values && values.title) || product.title %>" required>
+<input name="sku" value="<%= (values && values.sku) || product.sku %>" required>
+<input type="number" step="0.01" min="0" name="price" value="<%= (values && values.price) || product.price %>" required>
+<input type="number" min="0" name="stockQty" value="<%= (values && values.stockQty) || product.stockQty %>" required>
+<select name="status">
+  <option <%= ((values && values.status) || product.status)==='Draft' ? 'selected' : '' %>>Draft</option>
+  <option <%= ((values && values.status) || product.status)==='Active' ? 'selected' : '' %>>Active</option>
+</select>

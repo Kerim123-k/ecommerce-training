@@ -1,0 +1,80 @@
+<%- include('../shared/header') %>
+<h1>Order <%= order.orderNo %></h1>
+
+<p><strong>Status:</strong> <%= order.status %> |
+   <strong>Payment:</strong> <%= order.paymentStatus %> |
+   <strong>Created:</strong> <%= order.createdAt.toLocaleString() %></p>
+
+<h3>Customer</h3>
+<p><%= order.customerEmail || '-' %></p>
+
+<h3>Shipping Address</h3>
+<% if (order.shippingAddress) { %>
+  <address>
+    <div><%= order.shippingAddress.firstName || '' %> <%= order.shippingAddress.lastName || '' %></div>
+    <div><%= order.shippingAddress.line1 %></div>
+    <% if (order.shippingAddress.line2) { %><div><%= order.shippingAddress.line2 %></div><% } %>
+    <div><%= order.shippingAddress.city || '' %> <%= order.shippingAddress.province || '' %> <%= order.shippingAddress.postalCode || '' %></div>
+    <div><%= order.shippingAddress.country || '' %></div>
+    <div><%= order.shippingAddress.phone || '' %></div>
+  </address>
+<% } %>
+
+<h3>Items</h3>
+<table>
+  <thead><tr><th>Title</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+  <tbody>
+  <% order.items.forEach(i => { %>
+    <tr>
+      <td><%= i.title %></td>
+      <td><%= i.sku %></td>
+      <td><%= i.qty %></td>
+      <td>₺ <%= i.unitPrice.toFixed(2) %></td>
+      <td>₺ <%= (i.qty * i.unitPrice).toFixed(2) %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+
+<p><strong>Subtotal:</strong> ₺ <%= order.subtotal.toFixed(2) %> |
+   <strong>Shipping:</strong> ₺ <%= order.shipping.toFixed(2) %> |
+   <strong>Tax:</strong> ₺ <%= order.tax.toFixed(2) %> |
+   <strong>Grand Total:</strong> ₺ <%= order.grandTotal.toFixed(2) %></p>
+
+<h3>Actions</h3>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+  <% if (!['Cancelled','Shipped','Delivered'].includes(order.status)) { %>
+    <form method="POST" action="/admin/orders/<%= order._id %>/process"><button type="submit">Mark Processing</button></form>
+    <form method="POST" action="/admin/orders/<%= order._id %>/cancel" onsubmit="return confirm('Cancel and refund (mock)?')">
+      <button type="submit">Cancel (Refund)</button>
+    </form>
+  <% } %>
+
+  <% if (!['Cancelled','Delivered'].includes(order.status)) { %>
+    <form method="POST" action="/admin/orders/<%= order._id %>/ship">
+      <input name="carrier" placeholder="Carrier" required>
+      <input name="trackingNumber" placeholder="Tracking #" required>
+      <button type="submit">Mark Shipped</button>
+    </form>
+  <% } %>
+
+  <% if (order.status === 'Shipped') { %>
+    <form method="POST" action="/admin/orders/<%= order._id %>/deliver"><button type="submit">Mark Delivered</button></form>
+  <% } %>
+</div>
+
+<% if (order.tracking && (order.tracking.number || order.tracking.carrier)) { %>
+  <p><strong>Tracking:</strong> <%= order.tracking.carrier %> — <%= order.tracking.number %></p>
+<% } %>
+
+<% if (order.timeline && order.timeline.length) { %>
+  <h3>Timeline</h3>
+  <ul>
+    <% order.timeline.slice().reverse().forEach(t => { %>
+      <li><%= new Date(t.at).toLocaleString() %> — <strong><%= t.status %></strong> <%= t.note ? ('— ' + t.note) : '' %></li>
+    <% }) %>
+  </ul>
+<% } %>
+
+<p><a href="/admin/orders">Back to Orders</a></p>
+<%- include('../shared/footer') %>

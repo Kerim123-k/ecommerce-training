@@ -1,0 +1,13 @@
+<%- include('../shared/header') %>
+<h1>Sign In</h1>
+<% if (errors && errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
+<form method="POST" action="/auth/login" class="form">
+  <label>Email* <input type="email" name="email" value="<%= (values&&values.email)||'' %>" required></label>
+  <label>Password* <input type="password" name="password" required></label>
+  <button type="submit">Login</button>
+  <p><a href="/auth/forgot">Forgot your password?</a></p>
+  
+
+
+</form>
+<%- include('../shared/footer') %>

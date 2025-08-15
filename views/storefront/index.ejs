@@ -1,0 +1,24 @@
+<%- include('../shared/header') %>
+<h1>Shop</h1>
+
+<div class="grid">
+  <% if (!products.length) { %>
+    <p>No products yet.</p>
+  <% } %>
+
+  <% products.forEach(p => { %>
+    <div class="card">
+      <img src="<%= (p.images && p.images[0]) || 'https://via.placeholder.com/400x300?text=Product' %>" alt="<%= p.title %>">
+      <h3><%= p.title %></h3>
+      <p class="price">₺ <%= p.price.toFixed(2) %></p>
+
+      <!-- Add to cart button (THIS is the part you asked about) -->
+      <form method="POST" action="/cart/add/<%= p._id %>">
+        <input type="hidden" name="qty" value="1">
+        <button type="submit">Add to cart</button>
+      </form>
+    </div>
+  <% }) %>
+</div>
+
+<%- include('../shared/footer') %>

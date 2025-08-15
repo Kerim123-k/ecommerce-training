@@ -1,0 +1,41 @@
+<%- include('../shared/header') %>
+<h1>Orders</h1>
+
+<form method="GET" action="/admin/orders" style="margin:10px 0">
+  <input name="q" value="<%= q||'' %>" placeholder="Search order # or email">
+  <select name="status">
+    <option value="">All statuses</option>
+    <% ['New','Paid','Processing','Shipped','Delivered','Cancelled'].forEach(s => { %>
+      <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
+    <% }) %>
+  </select>
+  <button type="submit">Filter</button>
+</form>
+
+<table>
+  <thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Created</th></tr></thead>
+  <tbody>
+  <% orders.forEach(o => { %>
+    <tr>
+      <td><a href="/admin/orders/<%= o._id %>"><%= o.orderNo %></a></td>
+      <td><%= o.customerEmail || '-' %></td>
+      <td><%= o.items.reduce((n,i)=>n+i.qty,0) %></td>
+      <td>₺ <%= o.grandTotal.toFixed(2) %></td>
+      <td><%= o.status %></td>
+      <td><%= o.createdAt.toLocaleString() %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+
+<% if (pages && pages > 1) { %>
+  <p>
+    <% for (let p=1; p<=pages; p++) { %>
+      <% if (p === page) { %><strong><%= p %></strong> <% } else { %>
+        <a href="/admin/orders?<%= `q=${encodeURIComponent(q||'')}&status=${encodeURIComponent(status||'')}&page=${p}` %>"><%= p %></a>
+      <% } %>
+    <% } %>
+  </p>
+<% } %>
+<%- include('../shared/footer') %>
+

@@ -1,0 +1,20 @@
+<%- include('../shared/header') %>
+<h1>Edit Category</h1>
+
+<form method="POST" action="/admin/categories/<%= cat._id %>/edit" class="form">
+  <label>Name* <input name="name" value="<%= cat.name %>" required></label>
+  <label>Status
+    <select name="status">
+      <option <%= cat.status==='Active'?'selected':'' %>>Active</option>
+      <option <%= cat.status==='Hidden'?'selected':'' %>>Hidden</option>
+    </select>
+  </label>
+  <label>Description <input name="description" value="<%= cat.description || '' %>"></label>
+  <button type="submit">Save changes</button>
+</form>
+
+<form method="POST" action="/admin/categories/<%= cat._id %>/delete" onsubmit="return confirm('Delete this category?')">
+  <button type="submit">Delete</button>
+</form>
+
+<%- include('../shared/footer') %>

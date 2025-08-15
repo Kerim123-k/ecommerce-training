@@ -1,0 +1,27 @@
+<%- include('../shared/header') %>
+<h1>Categories</h1>
+
+<p><a href="/admin/categories/new">+ Add Category</a></p>
+
+<% if (!cats.length) { %>
+  <p>No categories yet. <a href="/admin/categories/new">Create one</a>.</p>
+  <%- include('../shared/footer') %>
+<% } else { %>
+
+<ul>
+  <% cats.forEach(c => { %>
+    <li>
+      <strong><%= c.name %></strong>
+      — <small><%= c.status %></small>
+      — <small>Products: <%= (counts && counts[String(c._id)]) || 0 %></small>
+
+      <a href="/admin/categories/<%= c._id %>/edit">Edit</a>
+      <form method="POST" action="/admin/categories/<%= c._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this category?')">
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+  <% }) %>
+</ul>
+
+  <%- include('../shared/footer') %>
+<% } %>

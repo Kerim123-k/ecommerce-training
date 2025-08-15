@@ -1,0 +1,33 @@
+<%- include('../shared/header') %>
+<h1>Products</h1>
+
+<p><a href="/admin/products/new">+ Add Product</a></p>
+
+<% if (!products.length) { %>
+  <p>No products yet. <a href="/admin/products/new">Create the first one</a>.</p>
+<%- include('../shared/footer') %>
+<% } else { %>
+
+<table>
+  <thead><tr><th>Title</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  <% products.forEach(p => { %>
+    <tr>
+      <td><%= p.title %></td>
+      <td><%= p.sku %></td>
+      <td><%= p.price.toFixed(2) %></td>
+      <td><%= p.stockQty %></td>
+      <td><%= p.status %></td>
+      <td>
+        <a href="/admin/products/<%= p._id %>/edit">Edit</a>
+        <form method="POST" action="/admin/products/<%= p._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this product?')">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+
+<%- include('../shared/footer') %>
+<% } %>

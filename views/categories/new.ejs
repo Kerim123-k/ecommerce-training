@@ -1,0 +1,31 @@
+<%- include('../shared/header') %>
+<h1>Add Category</h1>
+
+<% if (errors && errors.length) { %>
+  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+<% } %>
+
+<form method="POST" action="/admin/categories" class="form">
+  <label>Name* <input name="name" value="<%= (values && values.name) || '' %>" required></label>
+
+  <label>Parent (optional)
+    <select name="parentId">
+      <option value="">— None —</option>
+      <% (parents||[]).forEach(p => { %>
+        <option value="<%= p._id %>" <%= (values && values.parentId===String(p._id))?'selected':'' %>><%= p.name %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <label>Status
+    <select name="status">
+      <option <%= (!values || values.status==='Active')?'selected':'' %>>Active</option>
+      <option <%= (values && values.status==='Hidden')?'selected':'' %>>Hidden</option>
+    </select>
+  </label>
+
+  <label>Description <input name="description" value="<%= (values && values.description) || '' %>"></label>
+  <button type="submit">Save</button>
+</form>
+<%- include('../shared/footer') %>
+

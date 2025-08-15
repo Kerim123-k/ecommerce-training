@@ -1,0 +1,5 @@
+<%- include('../shared/header') %>
+<h1>Thank you!</h1>
+<p>Order <strong><%= order.orderNo %></strong> placed. Total: ₺ <%= order.grandTotal.toFixed(2) %></p>
+<p><a href="/products">Continue shopping</a></p>
+<%- include('../shared/footer') %>

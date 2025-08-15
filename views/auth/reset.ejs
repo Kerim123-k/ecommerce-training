@@ -1,0 +1,13 @@
+<%- include('../shared/header') %>
+<h1>Set a New Password</h1>
+
+<% if (errors && errors.length) { %>
+  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+<% } %>
+
+<form method="POST" action="/auth/reset/<%= token %>" class="form">
+  <label>New password <input type="password" name="password" minlength="6" required></label>
+  <button type="submit">Update Password</button>
+</form>
+<%- include('../shared/footer') %>
+
