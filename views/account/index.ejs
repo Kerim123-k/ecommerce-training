@@ -1,0 +1,5 @@
+<%- include('../shared/header') %>
+<h1>My Account</h1>
+<p><strong><%= me.firstName || '' %> <%= me.lastName || '' %></strong> — <%= me.email %></p>
+<p><a href="/account/addresses">Manage addresses</a> • <a href="/account/orders">My orders</a></p>
+<%- include('../shared/footer') %>

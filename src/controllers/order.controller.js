@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const Customer = require('../models/Customer');
+
 // const Customer = require('../models/Customer'); // uncomment if/when you use it
 
 function orderNo() {
@@ -20,6 +22,18 @@ exports.checkout = async (req, res, next) => {
     const cart = req.session.cart || { items: [], subtotal: 0 };
     if (!cart.items.length) return res.redirect('/cart');
 
+    // 🔒 Block suspended accounts
+    if (req.session.user?._id) {
+      const me = await Customer.findById(req.session.user._id).lean();
+      if (me && me.status === 'Suspended') {
+        return res.status(403).render('checkout/index', {
+          cart,
+          errors: [{ msg: 'Your account is suspended. Please contact support.' }],
+          values: req.body
+        });
+      }
+    }
+
     // Stock & availability check
     const ids = cart.items.map(i => i.productId);
     const dbProducts = await Product.find({ _id: { $in: ids } });
@@ -36,6 +50,9 @@ exports.checkout = async (req, res, next) => {
         });
       }
     }
+
+    // ... (rest of your order creation, stock decrement, clear cart, redirect)
+
 
     // Build order
     const shippingAddress = {

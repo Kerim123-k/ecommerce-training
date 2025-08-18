@@ -1,0 +1,15 @@
+<%- include('../../shared/header') %>
+<h1>Edit Address</h1>
+<% if (errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
+<form method="POST" action="/account/addresses/<%= idx %>/edit" class="form">
+  <label>Label <input name="label" value="<%= (values && values.label) || addr.label || '' %>"></label>
+  <label>Line 1* <input name="line1" required value="<%= (values && values.line1) || addr.line1 %>"></label>
+  <label>Line 2 <input name="line2" value="<%= (values && values.line2) || addr.line2 || '' %>"></label>
+  <label>City* <input name="city" required value="<%= (values && values.city) || addr.city %>"></label>
+  <label>Province <input name="province" value="<%= (values && values.province) || addr.province || '' %>"></label>
+  <label>Postal Code <input name="postalCode" value="<%= (values && values.postalCode) || addr.postalCode || '' %>"></label>
+  <label>Country* <input name="country" required value="<%= (values && values.country) || addr.country || 'TR' %>"></label>
+  <label>Phone <input name="phone" value="<%= (values && values.phone) || addr.phone || '' %>"></label>
+  <button type="submit">Save</button>
+</form>
+<%- include('../../shared/footer') %>

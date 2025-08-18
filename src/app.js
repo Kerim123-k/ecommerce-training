@@ -56,6 +56,11 @@ app.use(require('./routes/cart.routes'));
 app.use(require('./routes/order.routes'));
 
 
+
+app.use(require('./routes/account.routes'));
+
+
+
 // 404 (optional)
 app.use((req, res) => res.status(404).send('Not found'));
 
@@ -73,3 +78,8 @@ connectDB(process.env.MONGO_URI)
     console.error('❌ Mongo connect failed:', err.message);
     process.exit(1);
   });
+
+
+  app.get('/healthz', (_req,res)=>res.type('text').send('OK'));
+
+app.use(require('./routes/account.routes'));

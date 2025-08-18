@@ -1,0 +1,27 @@
+<%- include('../../shared/header') %>
+<h1>Addresses</h1>
+<p><a href="/account/addresses/new">+ Add address</a></p>
+<% if (!me.addresses?.length) { %>
+  <p>No addresses yet.</p>
+<% } else { %>
+  <ul>
+    <% me.addresses.forEach((a, i) => { %>
+      <li>
+        <strong><%= a.label || 'Address' %></strong>
+        <% if (a.isDefault) { %><em>(default)</em><% } %><br>
+        <%= a.line1 %> <%= a.line2 %>, <%= a.city %>, <%= a.country %>
+        —
+        <a href="/account/addresses/<%= i %>/edit">Edit</a>
+        <form method="POST" action="/account/addresses/<%= i %>/delete" style="display:inline" onsubmit="return confirm('Delete this address?')">
+          <button type="submit">Delete</button>
+        </form>
+        <% if (!a.isDefault) { %>
+          <form method="POST" action="/account/addresses/<%= i %>/default" style="display:inline">
+            <button type="submit">Make default</button>
+          </form>
+        <% } %>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>
+<%- include('../../shared/footer') %>

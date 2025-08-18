@@ -12,3 +12,10 @@ exports.requireActiveCustomer = async (req, res, next) => {
   if (!me || me.status === 'Suspended') return res.status(403).send('Account suspended');
   next();
 };
+
+exports.ensureAuth = (req, res, next) => {
+  if (req.session.user) return next();
+  req.session.returnTo = req.originalUrl;
+  return res.redirect('/auth/login');
+};
+

@@ -12,15 +12,15 @@
     <select name="parentId">
       <option value="">— None —</option>
       <% (parents||[]).forEach(p => { %>
-        <option value="<%= p._id %>" <%= (values && values.parentId===String(p._id))?'selected':'' %>><%= p.name %></option>
+        <option value="<%= p._id %>" <%= (values && values.parentId==String(p._id)) ? 'selected' : '' %>><%= p.name %></option>
       <% }) %>
     </select>
   </label>
 
   <label>Status
     <select name="status">
-      <option <%= (!values || values.status==='Active')?'selected':'' %>>Active</option>
-      <option <%= (values && values.status==='Hidden')?'selected':'' %>>Hidden</option>
+      <option <%= (values && values.status==='Active') ? 'selected':'' %>>Active</option>
+      <option <%= (values && values.status==='Hidden') ? 'selected':'' %>>Hidden</option>
     </select>
   </label>
 
@@ -28,4 +28,3 @@
   <button type="submit">Save</button>
 </form>
 <%- include('../shared/footer') %>
-

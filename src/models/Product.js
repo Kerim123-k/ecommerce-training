@@ -13,8 +13,10 @@ const productSchema = new Schema({
   tags: [String],
   brand: String,
   taxable: { type: Boolean, default: true },
-  trackInventory: { type: Boolean, default: true }
-}, { timestamps: true });
+  trackInventory: { type: Boolean, default: true },
+
+isDeleted: { type: Boolean, default: false }
+},{ timestamps: true });
 
 module.exports = model('Product', productSchema);
 // add required 

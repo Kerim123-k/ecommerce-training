@@ -3,12 +3,17 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const slugify = require('slugify');
 const { validationResult } = require('express-validator');
+const toArray = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+const Order = require('../models/Order');
 
 /**
  * List (admin)
  */
 exports.list = async (_req, res) => {
-  const products = await Product.find().populate('categories').sort({ createdAt: -1 });
+  const products = await Product.find({ isDeleted: { $ne: true } })
+  .populate('categories')
+  .sort({ createdAt: -1 });
+
   res.render('products/index', { products });
 };
 
@@ -30,19 +35,16 @@ exports.create = async (req, res, next) => {
       return renderNewWithErrors(req, res, result.array().map(e => e.msg));
     }
 
-    // Duplicate by SKU (case-insensitive handled in route sanitizer to UPPER)
-    const exists = await Product.exists({ sku: req.body.sku });
+    // duplicate by SKU (case-insensitive because we upper-cased it in the route)
+    const exists = await Product.exists({ sku: req.body.sku, isDeleted: { $ne: true } });
     if (exists) return renderNewWithErrors(req, res, ['A product with this SKU already exists.']);
 
-    const { title, sku, price, stockQty, status = 'Draft', categories = [], image } = req.body;
+    const { title, sku, price, stockQty, status='Draft', categories=[], image } = req.body;
 
-    // Normalize arrays
-    const catsArr   = Array.isArray(categories) ? categories : (categories ? [categories] : []);
-    const imagesArr = image ? [image] : [];
-
-    // PRD rule: cannot activate without ≥1 image & ≥1 category
-    if (status === 'Active' && (catsArr.length === 0 || imagesArr.length === 0)) {
-      return renderNewWithErrors(req, res, ['Active products must have at least one category and one image.']);
+    // ENFORCE activation rules if trying to set Active
+    if (status === 'Active') {
+      const errs = await checkActivationRules({ categories, images: image });
+      if (errs.length) return renderNewWithErrors(req, res, errs);
     }
 
     await Product.create({
@@ -51,14 +53,13 @@ exports.create = async (req, res, next) => {
       price: Number(price),
       stockQty: Number(stockQty),
       status,
-      categories: catsArr,
-      images: imagesArr,
+      categories: toArray(categories),
+      images: image ? [image] : [],
       slug: slugify(title, { lower: true, strict: true })
     });
 
     res.redirect('/admin/products');
   } catch (e) {
-    // Mongo unique index error fallback
     if (e.code === 11000 && e.keyPattern && e.keyPattern.sku) {
       return renderNewWithErrors(req, res, ['A product with this SKU already exists.']);
     }
@@ -66,11 +67,14 @@ exports.create = async (req, res, next) => {
   }
 };
 
+
 /**
  * Public storefront (active products only)
  */
 exports.storefront = async (_req, res) => {
-  const products = await Product.find({ status: 'Active' }).sort({ createdAt: -1 });
+  const products = await Product.find({ status: 'Active', isDeleted: { $ne: true } })
+  .sort({ createdAt: -1 });
+
   res.render('storefront/index', { products });
 };
 
@@ -98,19 +102,16 @@ exports.update = async (req, res, next) => {
       return renderEditWithErrors(req, res, req.params.id, result.array().map(e => e.msg));
     }
 
-    // Duplicate by SKU (ignore current doc)
-    const dup = await Product.exists({ sku: req.body.sku, _id: { $ne: req.params.id } });
+    // duplicate by SKU (ignore current doc), also ignore soft-deleted
+    const dup = await Product.exists({ sku: req.body.sku, _id: { $ne: req.params.id }, isDeleted: { $ne: true } });
     if (dup) return renderEditWithErrors(req, res, req.params.id, ['A product with this SKU already exists.']);
 
-    const { title, sku, price, stockQty, status = 'Draft', categories = [], image } = req.body;
+    const { title, sku, price, stockQty, status='Draft', categories=[], image } = req.body;
 
-    // Normalize arrays
-    const catsArr   = Array.isArray(categories) ? categories : (categories ? [categories] : []);
-    const imagesArr = image ? [image] : [];
-
-    // PRD rule: cannot activate without ≥1 image & ≥1 category
-    if (status === 'Active' && (catsArr.length === 0 || imagesArr.length === 0)) {
-      return renderEditWithErrors(req, res, req.params.id, ['Active products must have at least one category and one image.']);
+    // ENFORCE activation rules if trying to set Active
+    if (status === 'Active') {
+      const errs = await checkActivationRules({ categories, images: image });
+      if (errs.length) return renderEditWithErrors(req, res, req.params.id, errs);
     }
 
     await Product.findByIdAndUpdate(
@@ -121,8 +122,8 @@ exports.update = async (req, res, next) => {
         price: Number(price),
         stockQty: Number(stockQty),
         status,
-        categories: catsArr,
-        images: imagesArr,
+        categories: toArray(categories),
+        images: image ? [image] : [],
         slug: slugify(title, { lower: true, strict: true })
       },
       { runValidators: true }
@@ -137,12 +138,22 @@ exports.update = async (req, res, next) => {
   }
 };
 
+
 /**
  * Delete (admin)
  */
 exports.destroy = async (req, res, next) => {
   try {
-    await Product.findByIdAndDelete(req.params.id);
+    const id = req.params.id;
+
+    // If product appears in any order items, soft-delete instead of hard delete
+    const used = await Order.exists({ 'items.productId': id });
+    if (used) {
+      await Product.findByIdAndUpdate(id, { isDeleted: true, status: 'Draft' });
+      return res.redirect('/admin/products');
+    }
+
+    await Product.findByIdAndDelete(id);
     res.redirect('/admin/products');
   } catch (e) { next(e); }
 };
@@ -168,4 +179,25 @@ async function renderEditWithErrors(req, res, productId, messages) {
     errors: messages.map(msg => ({ msg })),
     values: req.body
   });
+}
+
+async function checkActivationRules({ categories, images }) {
+  const errors = [];
+  const catIds = toArray(categories);
+  const imgs = Array.isArray(images) ? images : (images ? [images] : []);
+
+  // need at least 1 image URL (non-empty)
+  if (imgs.filter(Boolean).length < 1) {
+    errors.push('To set status Active, add at least one image URL.');
+  }
+
+  // need at least 1 *active* category
+  if (catIds.length < 1) {
+    errors.push('To set status Active, select at least one category.');
+  } else {
+    const activeCount = await Category.countDocuments({ _id: { $in: catIds }, status: 'Active' });
+    if (activeCount < 1) errors.push('Selected categories are not active. Choose at least one active category.');
+  }
+
+  return errors;
 }

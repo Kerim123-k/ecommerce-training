@@ -1,0 +1,25 @@
+<%- include('../shared/header') %>
+<h1>My Orders</h1>
+
+<% if (!orders.length) { %>
+  <p>No orders yet.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th></tr>
+    </thead>
+    <tbody>
+    <% orders.forEach(o => { %>
+      <tr>
+        <td><%= o.orderNo %></td>
+        <td><%= new Date(o.createdAt).toLocaleString() %></td>
+        <td><%= o.status %></td>
+        <td><%= o.grandTotal.toFixed(2) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<%- include('../shared/footer') %>
+
