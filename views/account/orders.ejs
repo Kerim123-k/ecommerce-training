@@ -1,22 +1,23 @@
 <%- include('../shared/header') %>
 <h1>My Orders</h1>
 
-<% if (!orders.length) { %>
+<% if (!orders || !orders.length) { %>
   <p>No orders yet.</p>
 <% } else { %>
-  <table>
+  <table class="table">
     <thead>
-      <tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th></tr>
+      <tr><th>Order #</th><th>Items</th><th>Total</th><th>Status</th><th>Created</th></tr>
     </thead>
     <tbody>
-    <% orders.forEach(o => { %>
-      <tr>
-        <td><%= o.orderNo %></td>
-        <td><%= new Date(o.createdAt).toLocaleString() %></td>
-        <td><%= o.status %></td>
-        <td><%= o.grandTotal.toFixed(2) %></td>
-      </tr>
-    <% }) %>
+      <% orders.forEach(o => { %>
+        <tr>
+          <td><%= o.orderNo %></td>
+          <td><%= o.items?.length || 0 %></td>
+          <td>₺ <%= (o.grandTotal ?? o.subtotal).toFixed(2) %></td>
+          <td><%= o.status %></td>
+          <td><%= new Date(o.createdAt).toLocaleString() %></td>
+        </tr>
+      <% }) %>
     </tbody>
   </table>
 <% } %>

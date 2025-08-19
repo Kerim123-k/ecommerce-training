@@ -2,20 +2,21 @@
 const Category = require('../models/Category');
 const Product  = require('../models/Product');
 const slugify  = require('slugify');
+const mongoose = require('mongoose');
 
 // ADMIN: list categories (with product counts)
 exports.list = async (_req, res, next) => {
   try {
     const cats = await Category.find().sort({ name: 1 }).lean();
 
-    // counts per category
     const countsAgg = await Product.aggregate([
+      { $match: { isDeleted: { $ne: true } } },   // <— important
       { $unwind: { path: '$categories', preserveNullAndEmptyArrays: false } },
       { $group: { _id: '$categories', count: { $sum: 1 } } }
     ]);
     const counts = Object.fromEntries(countsAgg.map(c => [String(c._id), c.count]));
 
-    res.render('categories/index', { cats, counts });
+    res.render('categories/index', { cats, counts, banner: null });
   } catch (e) { next(e); }
 };
 
@@ -77,7 +78,33 @@ exports.update = async (req, res, next) => {
 // ADMIN: delete
 exports.destroy = async (req, res, next) => {
   try {
-    await Category.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.sendStatus(400);
+
+    // Block deletion if any NON–soft-deleted product still references this category
+    const inUseCount = await Product.countDocuments({
+      categories: new mongoose.Types.ObjectId(id),
+      isDeleted: { $ne: true },
+    });
+
+    if (inUseCount > 0) {
+      // Re-render list with a banner + correct counts
+      const cats = await Category.find().sort({ name: 1 }).lean();
+      const countsAgg = await Product.aggregate([
+        { $match: { isDeleted: { $ne: true } } },            // <— exclude soft-deleted
+        { $unwind: '$categories' },
+        { $group: { _id: '$categories', count: { $sum: 1 } } }
+      ]);
+      const counts = Object.fromEntries(countsAgg.map(c => [String(c._id), c.count]));
+
+      return res.status(400).render('categories/index', {
+        cats,
+        counts,
+        banner: `⚠️ Cannot delete: ${inUseCount} product(s) still use this category.`,
+      });
+    }
+
+    await Category.deleteOne({ _id: id }); // OK to delete
     res.redirect('/admin/categories');
   } catch (e) { next(e); }
 };

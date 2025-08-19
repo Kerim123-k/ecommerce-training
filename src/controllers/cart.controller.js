@@ -1,4 +1,7 @@
-const Product = require('../models/Product');
+// src/controllers/cart.controller.js
+const Product  = require('../models/Product');
+const Customer = require('../models/Customer');
+const Order    = require('../models/Order');
 
 function getCart(req){
   if (!req.session.cart) req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
@@ -35,7 +38,6 @@ exports.add = async (req,res,next) => {
 
 exports.update = (req,res) => {
   const cart = getCart(req);
-  // body: [{id, qty}] OR single fields id, qty
   const updates = Array.isArray(req.body.items) ? req.body.items : [{ id: req.body.id, qty: req.body.qty }];
   updates.forEach(u => {
     const it = cart.items.find(i => String(i.productId) === String(u.id));
@@ -49,4 +51,83 @@ exports.update = (req,res) => {
 exports.clear = (req,res) => {
   req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
   res.redirect('/cart');
+};
+
+// ---------- CHECKOUT (GET) ----------
+exports.showCheckout = async (req, res, next) => {
+  try {
+    const userId = (req.session?.user && req.session.user._id) || req.session?.userId || req.user?._id;
+    if (!userId) return res.redirect('/auth/login');
+
+    const me = await Customer.findById(userId).lean();
+    const addresses = me?.addresses || [];
+
+    const cart = getCart(req);
+    res.render('checkout/index', { addresses, cart, subTotal: cart.subtotal });
+  } catch (e) { next(e); }
+};
+
+// ---------- PLACE ORDER (POST) ----------
+exports.placeOrder = async (req, res, next) => {
+  try {
+    const userId = (req.session?.user && req.session.user._id) || req.session?.userId || req.user?._id;
+    if (!userId) return res.redirect('/auth/login');
+
+    // 1) Resolve address (selected or default)
+    const me = await Customer.findById(userId);
+    if (!me) return res.redirect('/auth/login');
+
+    const selectedId = req.body.addressId;
+    let shipAddr = me.addresses?.find(a => String(a._id) === String(selectedId));
+    if (!shipAddr) shipAddr = me.addresses?.find(a => a.isDefault) || me.addresses?.[0];
+    if (!shipAddr) return res.redirect('/account/addresses/new');
+
+    const shippingAddress = {
+      fullName:   shipAddr.fullName,
+      phone:      shipAddr.phone,
+      line1:      shipAddr.line1,
+      line2:      shipAddr.line2,
+      city:       shipAddr.city,
+      postalCode: shipAddr.postalCode,
+      country:    shipAddr.country,
+    };
+
+    // 2) Build order items from session cart
+    const cart = getCart(req);
+    if (!cart.items.length) return res.redirect('/cart');
+
+    const ids = cart.items.map(i => i.productId);
+    const dbProducts = await Product.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
+
+    const items = cart.items.map(i => {
+      const p = dbProducts.find(d => String(d._id) === String(i.productId));
+      if (!p) throw new Error('Product not found during checkout');
+      if (p.stockQty < i.qty) throw new Error(`Insufficient stock for ${p.title}`);
+      return { productId: p._id, sku: p.sku, title: p.title, qty: i.qty, unitPrice: p.price };
+    });
+
+    const subTotal = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+
+    // 3) Create order (includes address snapshot)
+    const orderNo = 'ORD-' + Math.floor(Date.now() / 1000);
+    await Order.create({
+      orderNo,
+      customerId: userId,
+      customerEmail: me.email,
+      items,
+      totals: { subTotal, grandTotal: subTotal },
+      shippingAddress,
+      status: 'Paid',
+      payment: { method: 'Mock', txnId: 'demo' }
+    });
+
+    // 4) Decrement stock
+    for (const it of items) {
+      await Product.updateOne({ _id: it.productId }, { $inc: { stockQty: -it.qty } });
+    }
+
+    // 5) Clear cart and thank-you
+    req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
+    res.redirect('/checkout/thankyou');
+  } catch (e) { next(e); }
 };

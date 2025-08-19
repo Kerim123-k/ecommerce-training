@@ -1,85 +1,69 @@
 // src/app.js
+require('dotenv').config();
 const path = require('path');
 const express = require('express');
-const morgan = require('morgan');
-const dotenv = require('dotenv');
-const connectDB = require('./config/db');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-
-
-dotenv.config();
+const morgan  = require('morgan');
 
 const app = express();
 
-// View engine & static
+/* ---------- Views & core middleware ---------- */
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, '..', 'views'));
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
-// Parsers & logs
+app.set('views', path.join(__dirname, '../views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(morgan(process.env.NODE_ENV === 'test' ? 'tiny' : 'dev'));
 
-// Sessions (login + cart)
+/* ---------- Sessions (must come BEFORE locals) ---------- */
+let store;
+if (process.env.NODE_ENV === 'test') {
+  store = new session.MemoryStore();
+} else {
+  const MongoStore = require('connect-mongo');
+  store = process.env.MONGO_URI
+    ? MongoStore.create({ mongoUrl: process.env.MONGO_URI })
+    : new session.MemoryStore();
+}
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-    dbName: 'ecommerce_training',
-    collectionName: 'sessions'
-  }),
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 7 days
+  cookie: { maxAge: 1000 * 60 * 60 },
+  store,
 }));
 
-// Make user & cart count available to all views
+/* ---------- Safe locals (after session) ---------- */
 app.use((req, res, next) => {
-  res.locals.currentUser = req.session.user || null;
-  const cart = req.session.cart || { items: [], itemCount: 0, subtotal: 0 };
-  res.locals.cartCount = cart.itemCount;
+  res.locals.cartCount   = req.session?.cart?.itemCount || 0;
+  res.locals.currentUser = req.session?.user || null;
+  res.locals.banner      = null;
   next();
 });
 
+/* ---------- Routes ---------- */
+const authRoutes            = require('./routes/auth.routes');             // /auth/*
+const productRoutes         = require('./routes/product.routes');          // /admin/products, /products
+const categoryRoutes        = require('./routes/category.routes');         // /admin/categories
+const cartRoutes            = require('./routes/cart.routes');             // /cart, /checkout
+const accountAddressRoutes  = require('./routes/account.address.routes');  // /account/addresses
+const orderRoutes           = require('./routes/order.routes');            // /admin/orders, thank-you, etc.
+const accountRoutes = require('./routes/account.routes');
 
-// Routes
+
+app.use(authRoutes);
+app.use(productRoutes);
+app.use(categoryRoutes);
+app.use(cartRoutes);
+app.use(accountAddressRoutes);
+app.use(orderRoutes);
+app.use(accountRoutes);
+
+/* ---------- Root & health ---------- */
 app.get('/', (_req, res) => res.redirect('/products'));
-app.use(require('./routes/category.routes'));
-app.use(require('./routes/product.routes'));
+app.get('/healthz', (_req, res) => res.status(200).send('OK'));
 
+/* ---------- 404 (keep last) ---------- */
+app.use((_req, res) => res.status(404).send('Not found'));
 
-
-app.use(require('./routes/auth.routes'));
-app.use(require('./routes/cart.routes'));
-app.use(require('./routes/order.routes'));
-
-
-
-app.use(require('./routes/account.routes'));
-
-
-
-// 404 (optional)
-app.use((req, res) => res.status(404).send('Not found'));
-
-// Error handler
-app.use((err, req, res, _next) => {
-  console.error(err);
-  res.status(500).send('Something went wrong.');
-});
-
-// Start after DB connects
-const port = process.env.PORT || 3000;
-connectDB(process.env.MONGO_URI)
-  .then(() => app.listen(port, () => console.log(`▶ http://localhost:${port}`)))
-  .catch(err => {
-    console.error('❌ Mongo connect failed:', err.message);
-    process.exit(1);
-  });
-
-
-  app.get('/healthz', (_req,res)=>res.type('text').send('OK'));
-
-app.use(require('./routes/account.routes'));
+module.exports = app;

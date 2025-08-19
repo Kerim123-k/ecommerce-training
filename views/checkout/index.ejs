@@ -1,16 +1,33 @@
 <%- include('../shared/header') %>
 <h1>Checkout</h1>
-<% if (errors && errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
-<form method="POST" action="/checkout" class="form">
-  <label>First name <input name="firstName" value="<%= (values&&values.firstName)||'' %>"></label>
-  <label>Last name <input name="lastName" value="<%= (values&&values.lastName)||'' %>"></label>
-  <label>Address line 1* <input name="line1" required value="<%= (values&&values.line1)||'' %>"></label>
-  <label>Address line 2 <input name="line2" value="<%= (values&&values.line2)||'' %>"></label>
-  <label>City <input name="city" value="<%= (values&&values.city)||'' %>"></label>
-  <label>Province <input name="province" value="<%= (values&&values.province)||'' %>"></label>
-  <label>Postal Code <input name="postalCode" value="<%= (values&&values.postalCode)||'' %>"></label>
-  <label>Country <input name="country" value="<%= (values&&values.country)||'TR' %>"></label>
-  <label>Phone <input name="phone" value="<%= (values&&values.phone)||'' %>"></label>
-  <button type="submit">Place Order (Mock Payment)</button>
-</form>
+
+<% if ((addresses || []).length) { %>
+  <form id="checkoutForm" method="POST" action="/checkout">
+    <label>Shipping address</label>
+    <select name="addressId">
+      <% addresses.forEach(a => { %>
+        <option value="<%= a._id %>" <%= a.isDefault ? 'selected' : '' %>>
+          <%= a.fullName %> — <%= a.line1 %>, <%= a.city %> (<%= a.country %>)
+        </option>
+      <% }) %>
+    </select>
+
+    <h3>Cart</h3>
+    <% const list = (cart && cart.items) || []; %>
+    <% if (!list.length) { %>
+      <p>Your cart is empty.</p>
+    <% } else { %>
+      <ul>
+        <% list.forEach(i => { %>
+          <li><%= i.qty %> × <%= i.title %> — ₺ <%= Number(i.unitPrice).toFixed(2) %></li>
+        <% }) %>
+      </ul>
+      <p><strong>Subtotal:</strong> ₺ <%= Number(subTotal).toFixed(2) %></p>
+      <button type="submit">Pay now (mock)</button>
+    <% } %>
+  </form>
+<% } else { %>
+  <p>No saved addresses. <a href="/account/addresses/new">Add one</a></p>
+<% } %>
+
 <%- include('../shared/footer') %>

@@ -1,5 +1,13 @@
 <%- include('../shared/header') %>
+
 <h1>Categories</h1>
+
+<% if (typeof banner !== 'undefined' && banner) { %>
+  <div class="alert alert-warning" style="padding:10px; border:1px solid #f3c78e; background:#fff7e6; border-radius:6px; margin:12px 0;">
+    <%= banner %>
+  </div>
+<% } %>
+
 <p><a href="/admin/categories/new">+ Add Category</a></p>
 
 <% if (!cats.length) { %>

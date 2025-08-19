@@ -71,11 +71,17 @@ exports.create = async (req, res, next) => {
 /**
  * Public storefront (active products only)
  */
-exports.storefront = async (_req, res) => {
-  const products = await Product.find({ status: 'Active', isDeleted: { $ne: true } })
-  .sort({ createdAt: -1 });
+exports.storefront = async (_req, res, next) => {
+  try {
+    const products = await Product
+      .find({ status: 'Active', isDeleted: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .lean();
 
-  res.render('storefront/index', { products });
+    res.render('storefront/index', { products }); // <-- was 'storefront/products'
+  } catch (err) {
+    next(err);
+  }
 };
 
 /**

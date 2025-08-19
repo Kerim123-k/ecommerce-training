@@ -1,22 +1,25 @@
 <%- include('../../shared/header') %>
-<h1>Addresses</h1>
+<h1>My Addresses</h1>
+
 <p><a href="/account/addresses/new">+ Add address</a></p>
-<% if (!me.addresses?.length) { %>
+
+<% const list = addresses || []; %>
+<% if (!list.length) { %>
   <p>No addresses yet.</p>
 <% } else { %>
   <ul>
-    <% me.addresses.forEach((a, i) => { %>
-      <li>
-        <strong><%= a.label || 'Address' %></strong>
-        <% if (a.isDefault) { %><em>(default)</em><% } %><br>
-        <%= a.line1 %> <%= a.line2 %>, <%= a.city %>, <%= a.country %>
-        —
-        <a href="/account/addresses/<%= i %>/edit">Edit</a>
-        <form method="POST" action="/account/addresses/<%= i %>/delete" style="display:inline" onsubmit="return confirm('Delete this address?')">
+    <% list.forEach(a => { %>
+      <li style="margin-bottom:10px;">
+        <strong><%= a.fullName %></strong>
+        <% if (a.isDefault) { %><span style="color:green"> (Default)</span><% } %><br/>
+        <%= a.line1 %> <%= a.line2 || '' %>, <%= a.city %>, <%= a.postalCode %>, <%= a.country %><br/>
+        <small><%= a.phone %></small><br/>
+        <a href="/account/addresses/<%= a._id %>/edit">Edit</a>
+        <form method="POST" action="/account/addresses/<%= a._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this address?')">
           <button type="submit">Delete</button>
         </form>
         <% if (!a.isDefault) { %>
-          <form method="POST" action="/account/addresses/<%= i %>/default" style="display:inline">
+          <form method="POST" action="/account/addresses/<%= a._id %>/default" style="display:inline">
             <button type="submit">Make default</button>
           </form>
         <% } %>
@@ -24,4 +27,5 @@
     <% }) %>
   </ul>
 <% } %>
+
 <%- include('../../shared/footer') %>

@@ -2,21 +2,26 @@
 <h1>Shop</h1>
 
 <div class="grid">
-  <% if (!products.length) { %>
+  <% const list = Array.isArray(products) ? products : []; %>
+
+  <% if (!list.length) { %>
     <p>No products yet.</p>
   <% } %>
 
-  <% products.forEach(p => { %>
+  <% list.forEach(p => { %>
     <div class="card">
-      <img src="<%= (p.images && p.images[0]) || 'https://via.placeholder.com/400x300?text=Product' %>" alt="<%= p.title %>">
+      <img src="<%= p.images?.[0] || 'https://via.placeholder.com/400x300?text=Product' %>" alt="<%= p.title %>">
       <h3><%= p.title %></h3>
-      <p class="price">₺ <%= p.price.toFixed(2) %></p>
+      <p class="price">₺ <%= Number(p.price ?? 0).toFixed(2) %></p>
 
-      <!-- Add to cart button (THIS is the part you asked about) -->
-      <form method="POST" action="/cart/add/<%= p._id %>">
-        <input type="hidden" name="qty" value="1">
-        <button type="submit">Add to cart</button>
-      </form>
+      <% if ((p.stockQty ?? 0) > 0) { %>
+        <form method="POST" action="/cart/add/<%= p._id %>">
+          <input type="hidden" name="qty" value="1">
+          <button type="submit">Add to cart</button>
+        </form>
+      <% } else { %>
+        <button type="button" disabled>Out of stock</button>
+      <% } %>
     </div>
   <% }) %>
 </div>

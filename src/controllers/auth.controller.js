@@ -1,19 +1,27 @@
+// src/controllers/auth.controller.js
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { validationResult } = require('express-validator');
 const Customer = require('../models/Customer');
 
-exports.registerForm = (_req,res) => res.render('auth/register', { errors: [], values: {} });
-exports.loginForm    = (_req,res) => res.render('auth/login',    { errors: [], values: {} });
+exports.registerForm = (_req,res) =>
+  res.render('auth/register', { errors: [], values: {} });
+
+exports.loginForm = (_req,res) =>
+  res.render('auth/login', { errors: [], values: {} });
 
 exports.register = async (req,res,next) => {
   try {
     const v = validationResult(req);
-    if (!v.isEmpty()) return res.status(400).render('auth/register', { errors: v.array(), values: req.body });
+    if (!v.isEmpty()) {
+      return res.status(400).render('auth/register', { errors: v.array(), values: req.body });
+    }
 
     const email = String(req.body.email || '').toLowerCase().trim();
     const exists = await Customer.exists({ email });
-    if (exists) return res.status(400).render('auth/register', { errors:[{msg:'Email already in use'}], values: req.body });
+    if (exists) {
+      return res.status(400).render('auth/register', { errors:[{msg:'Email already in use'}], values: req.body });
+    }
 
     const passwordHash = await bcrypt.hash(req.body.password, 10);
     const cust = await Customer.create({
@@ -22,26 +30,43 @@ exports.register = async (req,res,next) => {
       firstName: req.body.firstName || '',
       lastName:  req.body.lastName  || ''
     });
+
     req.session.user = { _id: cust._id, email: cust.email, name: (cust.firstName || cust.email) };
-    res.redirect(req.session.returnTo || '/products');
+
+    // ✅ consume and clear returnTo
+    const to = req.session.returnTo || '/products';
+    delete req.session.returnTo;
+    res.redirect(to);
   } catch (e) { next(e); }
 };
 
 exports.login = async (req,res,next) => {
   try {
     const v = validationResult(req);
-    if (!v.isEmpty()) return res.status(400).render('auth/login', { errors: v.array(), values: req.body });
+    if (!v.isEmpty()) {
+      return res.status(400).render('auth/login', { errors: v.array(), values: req.body });
+    }
 
     const email = String(req.body.email || '').toLowerCase().trim();
     const cust = await Customer.findOne({ email });
-    if (!cust) return res.status(400).render('auth/login', { errors:[{msg:'Invalid email or password'}], values: req.body });
-    if (cust.status === 'Suspended') return res.status(403).render('auth/login', { errors:[{msg:'Account suspended'}], values: req.body });
+    if (!cust) {
+      return res.status(400).render('auth/login', { errors:[{msg:'Invalid email or password'}], values: req.body });
+    }
+    if (cust.status === 'Suspended') {
+      return res.status(403).render('auth/login', { errors:[{msg:'Account suspended'}], values: req.body });
+    }
 
     const ok = await bcrypt.compare(req.body.password, cust.passwordHash);
-    if (!ok) return res.status(400).render('auth/login', { errors:[{msg:'Invalid email or password'}], values: req.body });
+    if (!ok) {
+      return res.status(400).render('auth/login', { errors:[{msg:'Invalid email or password'}], values: req.body });
+    }
 
     req.session.user = { _id: cust._id, email: cust.email, name: cust.firstName || cust.email };
-    res.redirect(req.session.returnTo || '/products');
+
+    // ✅ consume and clear returnTo
+    const to = req.session.returnTo || '/products';
+    delete req.session.returnTo;
+    res.redirect(to);
   } catch (e) { next(e); }
 };
 
@@ -55,17 +80,14 @@ exports.forgotForm = (_req, res) =>
   res.render('auth/forgot', { ok: false, errors: [], values: {} });
 
 exports.forgot = async (req, res) => {
-  console.log('[forgot] POST', req.body);
   try {
     const v = validationResult(req);
     if (!v.isEmpty()) {
-      console.log('[forgot] validation errors:', v.array());
       return res.status(400).render('auth/forgot', { ok: false, errors: v.array(), values: req.body });
     }
 
     const email = String(req.body.email || '').toLowerCase().trim();
     const cust  = await Customer.findOne({ email });
-    console.log('[forgot] lookup:', email, '→', cust ? 'FOUND' : 'NOT FOUND');
 
     if (cust) {
       const token = crypto.randomBytes(32).toString('hex');
@@ -104,7 +126,9 @@ exports.resetForm = async (req, res) => {
 exports.reset = async (req, res) => {
   try {
     const v = validationResult(req);
-    if (!v.isEmpty()) return res.status(400).render('auth/reset', { token: req.params.token, errors: v.array() });
+    if (!v.isEmpty()) {
+      return res.status(400).render('auth/reset', { token: req.params.token, errors: v.array() });
+    }
 
     const token = req.params.token;
     const hash  = crypto.createHash('sha256').update(token).digest('hex');
@@ -117,7 +141,10 @@ exports.reset = async (req, res) => {
     await cust.save();
 
     req.session.user = { _id: cust._id, email: cust.email, name: cust.firstName || cust.email };
-    res.redirect('/account/orders');
+
+    const to = req.session.returnTo || '/account/orders';
+    delete req.session.returnTo;
+    res.redirect(to);
   } catch (e) {
     console.error('[reset] error:', e);
     res.status(500).send('Unexpected error.');

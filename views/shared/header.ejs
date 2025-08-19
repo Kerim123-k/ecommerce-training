@@ -1,31 +1,34 @@
+<!-- views/shared/header.ejs -->
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Training Shop</title>
-  <link rel="stylesheet" href="/styles.css"/>
+  <meta charset="utf-8" />
+  <title><%= typeof title !== 'undefined' ? title : 'Training Shop' %></title>
+
+  <!-- ✅ Make sure this file exists at /public/styles.css -->
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-<nav class="topnav">
-  <a href="/products">Storefront</a>
+  <nav class="topnav">
+    <a href="/products">Storefront</a>
+    <a href="/admin/products">Admin: Products</a>
+    <a href="/admin/categories">Admin: Categories</a>
+    <a href="/admin/orders">Admin: Orders</a>
 
-  <a href="/admin/products">Admin: Products</a>
-  <a href="/admin/categories">Admin: Categories</a>
-  <a href="/admin/orders">Admin: Orders</a>
+    <span style="float:right">
+      <a href="/cart">Cart (<%= cartCount %>)</a>
+      <% if (currentUser) { %>
+        <a href="/account/orders">My Orders</a>
+        <a href="/account/addresses">My Addresses</a>
+        <span>Hello, <%= currentUser.name || currentUser.email %></span>
+        <form method="POST" action="/auth/logout" style="display:inline">
+          <button type="submit">Logout</button>
+        </form>
+      <% } else { %>
+        <a href="/auth/login">Login</a>
+        <a href="/auth/register">Register</a>
+      <% } %>
+    </span>
+  </nav>
 
-  <a href="/admin/products/new">+ Add Product</a>
-  <a href="/admin/categories/new">+ Add Category</a>
-
-  <span style="float:right">
-    <a href="/cart">Cart (<%= cartCount %>)</a>
-    <% if (currentUser) { %>
-      <a href="/account/orders">My Orders</a>
-      <span>Hello, <%= currentUser.name %></span>
-      <form method="POST" action="/auth/logout" style="display:inline"><button>Logout</button></form>
-    <% } else { %>
-      <a href="/auth/login">Login</a>
-      <a href="/auth/register">Register</a>
-    <% } %>
-  </span>
-</nav>
-<main>
+  <main class="container">

@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/app.js",
-    "start": "node src/app.js",
-    "sync-indexes": "node scripts/ensure-indexes.js"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "cross-env NODE_ENV=test jest --runInBand",
+    "test:watch": "cross-env NODE_ENV=test jest --watch"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +26,17 @@
     "slugify": "^1.6.6"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
-  }
+    "cross-env": "^10.0.0",
+    "jest": "^30.0.5",
+    "mongodb-memory-server": "^10.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  },
+  "jest": {
+  "testEnvironment": "node",
+  "testMatch": ["<rootDir>/src/tests/**/*.test.js"],
+  "setupFilesAfterEnv": ["<rootDir>/src/tests/jest.setup.js"],
+  "verbose": true
+}
+
 }
