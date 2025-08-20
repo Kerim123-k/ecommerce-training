@@ -1,52 +1,31 @@
-const { Schema, model } = require('mongoose');
+// src/models/Customer.js
+const mongoose = require('mongoose');   // 👈 add this
 
-const addressSchema = new Schema({
-  fullName:   { type: String, required: true, trim: true },
-  phone:      { type: String, required: true, trim: true },
-  line1:      { type: String, required: true, trim: true },
-  line2:      { type: String, trim: true },
-  city:       { type: String, required: true, trim: true },
-  postalCode: { type: String, required: true, trim: true },
-  country:    { type: String, required: true, trim: true, default: 'TR' },
-
+const AddressSchema = new mongoose.Schema({
+  fullName:   { type: String, trim: true },     // 👈 new field we read in the views
+  label:      { type: String, trim: true },
+  firstName:  { type: String, trim: true },
+  lastName:   { type: String, trim: true },
+  line1:      { type: String, required: true },
+  line2:      { type: String, default: '' },
+  city:       { type: String, required: true },
+  province:   { type: String, default: '' },
+  postalCode: { type: String, default: '' },
+  country:    { type: String, default: 'TR' },
+  phone:      { type: String, default: '' },
   isDefault:  { type: Boolean, default: false },
-  role: { type: String, enum: ['customer','admin'], default: 'customer' }
-}, { _id: true, timestamps: true },
-  
+}, { _id: true });
 
-);
-
-const customerSchema = new Schema({
-  email: { type: String, unique: true, required: true, trim: true, lowercase: true },
-  passwordHash: String,
-  name: String,
-  phone: String,
-  status: { type: String, enum: ['Active','Suspended'], default: 'Active' },
-
-  addresses: [addressSchema],
-
-  resetTokenHash: String,
+const CustomerSchema = new mongoose.Schema({
+  email:            { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash:     { type: String, required: true },
+  firstName:        { type: String, default: '' },
+  lastName:         { type: String, default: '' },
+  role:             { type: String, enum: ['User', 'Admin'], default: 'User' },
+  status:           { type: String, enum: ['Active', 'Suspended'], default: 'Active' },
+  addresses:        { type: [AddressSchema], default: [] },
+  resetTokenHash:   String,
   resetTokenExpires: Date,
 }, { timestamps: true });
 
-/** Ensure only one default; if none, first address becomes default */
-customerSchema.pre('save', function(next) {
-  if (!this.isModified('addresses')) return next();
-  let sawDefault = false;
-  this.addresses = (this.addresses || []).map(a => {
-    const obj = a.toObject?.() ?? a;
-    if (obj.isDefault && !sawDefault) { sawDefault = true; return obj; }
-    return { ...obj, isDefault: false };
-  });
-  if (!sawDefault && this.addresses.length > 0) {
-    this.addresses[0].isDefault = true;
-  }
-  next();
-});
-
-customerSchema.methods.setDefaultAddress = function(addrId) {
-  this.addresses.forEach(a => { a.isDefault = String(a._id) === String(addrId); });
-  return this.save();
-};
-
-module.exports = model('Customer', customerSchema);
+module.exports = mongoose.model('Customer', CustomerSchema);

@@ -10,5 +10,6 @@ router.post('/cart/clear', c.clear);
 // Checkout
 router.get('/checkout', requireAuth, c.showCheckout);
 router.post('/checkout', requireAuth, c.placeOrder);
+router.get('/checkout/thankyou', requireAuth, c.thankyou);
 
 module.exports = router;

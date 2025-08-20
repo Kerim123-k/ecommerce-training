@@ -33,6 +33,12 @@ app.use(session({
   store,
 }));
 
+const requireAdmin = require('./middleware/requireAdmin');
+app.use((req, res, next) => {
+  if (req.path.startsWith('/admin/')) return requireAdmin(req, res, next);
+  next();
+});
+
 /* ---------- Safe locals (after session) ---------- */
 app.use((req, res, next) => {
   res.locals.cartCount   = req.session?.cart?.itemCount || 0;

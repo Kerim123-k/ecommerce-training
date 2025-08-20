@@ -56,7 +56,7 @@ exports.clear = (req,res) => {
 // ---------- CHECKOUT (GET) ----------
 exports.showCheckout = async (req, res, next) => {
   try {
-    const userId = (req.session?.user && req.session.user._id) || req.session?.userId || req.user?._id;
+    const userId = req.session?.user?._id || req.user?._id;
     if (!userId) return res.redirect('/auth/login');
 
     const me = await Customer.findById(userId).lean();
@@ -68,32 +68,34 @@ exports.showCheckout = async (req, res, next) => {
 };
 
 // ---------- PLACE ORDER (POST) ----------
+// src/controllers/cart.controller.js
 exports.placeOrder = async (req, res, next) => {
   try {
-    const userId = (req.session?.user && req.session.user._id) || req.session?.userId || req.user?._id;
+    const userId = req.session?.user?._id || req.user?._id;
     if (!userId) return res.redirect('/auth/login');
 
-    // 1) Resolve address (selected or default)
     const me = await Customer.findById(userId);
     if (!me) return res.redirect('/auth/login');
 
-    const selectedId = req.body.addressId;
-    let shipAddr = me.addresses?.find(a => String(a._id) === String(selectedId));
-    if (!shipAddr) shipAddr = me.addresses?.find(a => a.isDefault) || me.addresses?.[0];
+    // 1) Resolve shipping address (selected > default > first)
+    const selectedId = String(req.body.addressId || '');
+    let shipAddr = (me.addresses || []).find(a => String(a._id) === selectedId)
+                || (me.addresses || []).find(a => a.isDefault)
+                || (me.addresses || [])[0];
     if (!shipAddr) return res.redirect('/account/addresses/new');
 
     const shippingAddress = {
-      fullName:   shipAddr.fullName,
-      phone:      shipAddr.phone,
+      fullName:   shipAddr.fullName || [shipAddr.firstName, shipAddr.lastName].filter(Boolean).join(' ').trim(),
+      phone:      shipAddr.phone || '',
       line1:      shipAddr.line1,
-      line2:      shipAddr.line2,
+      line2:      shipAddr.line2 || '',
       city:       shipAddr.city,
       postalCode: shipAddr.postalCode,
-      country:    shipAddr.country,
+      country:    shipAddr.country || 'TR',
     };
 
-    // 2) Build order items from session cart
-    const cart = getCart(req);
+    // 2) Build order items from the session cart
+    const cart = req.session.cart || { items: [] };
     if (!cart.items.length) return res.redirect('/cart');
 
     const ids = cart.items.map(i => i.productId);
@@ -101,33 +103,43 @@ exports.placeOrder = async (req, res, next) => {
 
     const items = cart.items.map(i => {
       const p = dbProducts.find(d => String(d._id) === String(i.productId));
-      if (!p) throw new Error('Product not found during checkout');
-      if (p.stockQty < i.qty) throw new Error(`Insufficient stock for ${p.title}`);
+      if (!p || p.status !== 'Active') throw new Error(`${i.title} unavailable`);
+      if (p.trackInventory && p.stockQty < i.qty) throw new Error(`Insufficient stock for ${p.title}`);
       return { productId: p._id, sku: p.sku, title: p.title, qty: i.qty, unitPrice: p.price };
     });
 
-    const subTotal = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+    const subtotal = items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
+    const grandTotal = Number(subtotal.toFixed(2)); // shipping/tax=0 for now
 
-    // 3) Create order (includes address snapshot)
-    const orderNo = 'ORD-' + Math.floor(Date.now() / 1000);
+    // 3) Create order (NOTE: root-level subtotal & grandTotal)
     await Order.create({
-      orderNo,
+      orderNo: 'ORD-' + Math.floor(Date.now() / 1000),
       customerId: userId,
       customerEmail: me.email,
       items,
-      totals: { subTotal, grandTotal: subTotal },
+      subtotal: grandTotal,   // or use `subtotal` if you prefer raw sum
+      grandTotal,
       shippingAddress,
       status: 'Paid',
-      payment: { method: 'Mock', txnId: 'demo' }
+      paymentMethod: 'Mock',
+      paymentStatus: 'Paid',
     });
 
     // 4) Decrement stock
-    for (const it of items) {
-      await Product.updateOne({ _id: it.productId }, { $inc: { stockQty: -it.qty } });
-    }
+    await Promise.all(items.map(it =>
+      Product.updateOne(
+        { _id: it.productId, trackInventory: true },
+        { $inc: { stockQty: -it.qty } }
+      )
+    ));
 
-    // 5) Clear cart and thank-you
+    // 5) Clear cart & redirect
     req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
     res.redirect('/checkout/thankyou');
   } catch (e) { next(e); }
 };
+
+exports.thankyou = (_req, res) => {
+  res.render('checkout/thankyou');
+};
+

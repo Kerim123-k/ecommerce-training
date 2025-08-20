@@ -31,7 +31,12 @@ exports.register = async (req,res,next) => {
       lastName:  req.body.lastName  || ''
     });
 
-    req.session.user = { _id: cust._id, email: cust.email, name: (cust.firstName || cust.email) };
+    req.session.user = {
+  _id: cust._id,
+  email: cust.email,
+  name: cust.firstName || cust.email,
+  role: cust.role || 'User',   // ← add this
+};
 
     // ✅ consume and clear returnTo
     const to = req.session.returnTo || '/products';
@@ -61,7 +66,13 @@ exports.login = async (req,res,next) => {
       return res.status(400).render('auth/login', { errors:[{msg:'Invalid email or password'}], values: req.body });
     }
 
-    req.session.user = { _id: cust._id, email: cust.email, name: cust.firstName || cust.email };
+    req.session.user = {
+  _id: cust._id,
+  email: cust.email,
+  name: cust.firstName || cust.email,
+  role: cust.role || 'User',   // 👈 include role
+};
+
 
     // ✅ consume and clear returnTo
     const to = req.session.returnTo || '/products';
@@ -140,7 +151,13 @@ exports.reset = async (req, res) => {
     cust.resetTokenExpires = undefined;
     await cust.save();
 
-    req.session.user = { _id: cust._id, email: cust.email, name: cust.firstName || cust.email };
+    req.session.user = {
+  _id: cust._id,
+  email: cust.email,
+  name: cust.firstName || cust.email,
+  role: cust.role || 'User',   // 👈 include role
+};
+
 
     const to = req.session.returnTo || '/account/orders';
     delete req.session.returnTo;

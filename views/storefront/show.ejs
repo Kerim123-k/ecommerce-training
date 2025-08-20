@@ -1,0 +1,42 @@
+<%- include('../shared/header') %>
+
+<div class="product-detail">
+  <div class="pd-media">
+    <img
+      src="<%= (product.images && product.images[0]) || 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1200&auto=format&fit=crop' %>"
+      alt="<%= product.title %>"
+    >
+  </div>
+
+  <div class="pd-info">
+    <h1><%= product.title %></h1>
+    <div class="muted">SKU <%= product.sku %></div>
+    <div class="price" style="margin:12px 0">₺ <%= Number(product.price ?? 0).toFixed(2) %></div>
+
+    <% if (product.stockQty > 0) { %>
+      <form method="POST" action="/cart/add/<%= product._id %>" class="pd-buy">
+        <label>Quantity
+          <input type="number" name="qty" value="1" min="1" max="<%= product.stockQty %>">
+        </label>
+        <button class="btn btn--brand" type="submit">Add to cart</button>
+      </form>
+      <div class="muted" style="margin-top:8px"><%= product.stockQty %> in stock</div>
+    <% } else { %>
+      <button class="btn" type="button" disabled>Out of stock</button>
+    <% } %>
+
+    <% if (product.description) { %>
+      <h3 style="margin-top:24px">Description</h3>
+      <p><%= product.description %></p>
+    <% } %>
+
+    <% if (product.categories && product.categories.length) { %>
+      <div class="muted" style="margin-top:16px">
+        Categories:
+        <%= product.categories.map(c => c.name).join(', ') %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../shared/footer') %>

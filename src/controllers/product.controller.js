@@ -5,7 +5,7 @@ const slugify = require('slugify');
 const { validationResult } = require('express-validator');
 const toArray = (v) => Array.isArray(v) ? v : (v ? [v] : []);
 const Order = require('../models/Order');
-
+const mongoose = require('mongoose');
 /**
  * List (admin)
  */
@@ -71,18 +71,53 @@ exports.create = async (req, res, next) => {
 /**
  * Public storefront (active products only)
  */
-exports.storefront = async (_req, res, next) => {
+exports.storefront = async (req, res, next) => {
   try {
-    const products = await Product
-      .find({ status: 'Active', isDeleted: { $ne: true } })
-      .sort({ createdAt: -1 })
-      .lean();
+    const { q = '', cat = '', sort = 'new', page = 1 } = req.query;
+    const limit = 12;
 
-    res.render('storefront/index', { products }); // <-- was 'storefront/products'
-  } catch (err) {
-    next(err);
-  }
+    const match = { status: 'Active', isDeleted: { $ne: true } };
+
+    // search by title/sku (case-insensitive)
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(safe, 'i');
+      match.$or = [{ title: re }, { sku: re }];
+    }
+
+    // category filter
+    if (cat && mongoose.Types.ObjectId.isValid(cat)) {
+      match.categories = new mongoose.Types.ObjectId(cat);
+    }
+
+    // sort
+    const sortMap = {
+      new:        { createdAt: -1 },
+      price_asc:  { price: 1 },
+      price_desc: { price: -1 },
+    };
+    const sortObj = sortMap[sort] || sortMap.new;
+
+    const [products, total, cats] = await Promise.all([
+      Product.find(match)
+        .sort(sortObj)
+        .skip((Number(page) - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(match),
+      Category.find({ status: 'Active' }).sort({ name: 1 }).lean(),
+    ]);
+
+    const pages = Math.max(1, Math.ceil(total / limit));
+
+    res.render('storefront/index', {
+      products, cats,
+      q, cat, sort,
+      page: Number(page), pages, total
+    });
+  } catch (e) { next(e); }
 };
+
 
 /**
  * Edit form (admin)
@@ -163,6 +198,24 @@ exports.destroy = async (req, res, next) => {
     res.redirect('/admin/products');
   } catch (e) { next(e); }
 };
+
+exports.show = async (req, res, next) => {
+  try {
+    const product = await Product.findOne({
+      slug: req.params.slug,
+      status: 'Active',
+      isDeleted: { $ne: true }
+    }).populate('categories').lean();
+
+    if (!product) {
+      return res.status(404).render('errors/404', { title: 'Not found' });
+      // or: return res.status(404).send('Product not found');
+    }
+
+    res.render('storefront/show', { product });
+  } catch (e) { next(e); }
+};
+
 
 /* ------------------------ helpers ------------------------ */
 

@@ -1,16 +1,50 @@
 <%- include('../../shared/header') %>
 <h1><%= values && values._id ? 'Edit address' : 'New address' %></h1>
 
-<form method="POST" action="<%= values && values._id ? ('/account/addresses/' + values._id + '/edit') : '/account/addresses' %>">
-  <label>Full name <input name="fullName" value="<%= values.fullName || '' %>" required></label><br/>
-  <label>Phone <input name="phone" value="<%= values.phone || '' %>" required></label><br/>
-  <label>Address line 1 <input name="line1" value="<%= values.line1 || '' %>" required></label><br/>
-  <label>Address line 2 <input name="line2" value="<%= values.line2 || '' %>"></label><br/>
-  <label>City <input name="city" value="<%= values.city || '' %>" required></label><br/>
-  <label>Postal code <input name="postalCode" value="<%= values.postalCode || '' %>" required></label><br/>
-  <label>Country <input name="country" value="<%= values.country || 'TR' %>" required></label><br/>
-  <label><input type="checkbox" name="isDefault" <%= values.isDefault ? 'checked' : '' %> /> Make default</label><br/><br/>
-  <button type="submit"><%= values && values._id ? 'Save' : 'Add' %></button>
+<% 
+  const v = values || {};
+  // Fallback order: fullName → first+last → label → empty
+  const nameVal = v.fullName 
+    || [v.firstName, v.lastName].filter(Boolean).join(' ')
+    || v.label 
+    || '';
+%>
+
+<form method="POST" action="<%= v && v._id ? ('/account/addresses/' + v._id + '/edit') : '/account/addresses' %>">
+  <label>Full name
+    <input name="fullName" value="<%= nameVal %>" required>
+  </label><br/>
+
+  <label>Phone
+    <input name="phone" value="<%= v.phone || '' %>" required>
+  </label><br/>
+
+  <label>Address line 1
+    <input name="line1" value="<%= v.line1 || '' %>" required>
+  </label><br/>
+
+  <label>Address line 2
+    <input name="line2" value="<%= v.line2 || '' %>">
+  </label><br/>
+
+  <label>City
+    <input name="city" value="<%= v.city || '' %>" required>
+  </label><br/>
+
+  <label>Postal code
+    <input name="postalCode" value="<%= v.postalCode || '' %>" required>
+  </label><br/>
+
+  <label>Country
+    <input name="country" value="<%= v.country || 'TR' %>" required>
+  </label><br/>
+
+  <label>
+    <input type="checkbox" name="isDefault" <%= v.isDefault ? 'checked' : '' %> />
+    Make default
+  </label><br/><br/>
+
+  <button type="submit"><%= v && v._id ? 'Save' : 'Add' %></button>
 </form>
 
 <p><a href="/account/addresses">← Back to addresses</a></p>

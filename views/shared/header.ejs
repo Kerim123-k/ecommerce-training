@@ -4,31 +4,39 @@
 <head>
   <meta charset="utf-8" />
   <title><%= typeof title !== 'undefined' ? title : 'Training Shop' %></title>
-
-  <!-- ✅ Make sure this file exists at /public/styles.css -->
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <nav class="topnav">
-    <a href="/products">Storefront</a>
-    <a href="/admin/products">Admin: Products</a>
-    <a href="/admin/categories">Admin: Categories</a>
-    <a href="/admin/orders">Admin: Orders</a>
+    <div class="bar">
+      <a href="/products">Storefront</a>
 
-    <span style="float:right">
-      <a href="/cart">Cart (<%= cartCount %>)</a>
+      <% if (currentUser && currentUser.role === 'Admin') { %>
+        <a href="/admin/products">Admin: Products</a>
+        <a href="/admin/categories">Admin: Categories</a>
+        <a href="/admin/orders">Admin: Orders</a>
+      <% } %>
+
+      <span class="spacer"></span>
+
+      <a href="/cart" class="btn">Cart <span class="badge"><%= cartCount %></span></a>
+
       <% if (currentUser) { %>
-        <a href="/account/orders">My Orders</a>
-        <a href="/account/addresses">My Addresses</a>
-        <span>Hello, <%= currentUser.name || currentUser.email %></span>
+        <a href="/account/orders" class="btn">My Orders</a>
+        <a href="/account/addresses" class="btn">My Addresses</a>
+        <span class="small">Hello, <%= currentUser.name || currentUser.email %></span>
         <form method="POST" action="/auth/logout" style="display:inline">
-          <button type="submit">Logout</button>
+          <button type="submit" class="btn">Logout</button>
         </form>
       <% } else { %>
-        <a href="/auth/login">Login</a>
-        <a href="/auth/register">Register</a>
+        <a href="/auth/login" class="btn">Login</a>
+        <a href="/auth/register" class="btn btn--brand">Register</a>
       <% } %>
-    </span>
+    </div>
   </nav>
+
+  <% if (banner) { %>
+    <div class="alert alert-warning"><%= banner %></div>
+  <% } %>
 
   <main class="container">

@@ -1,29 +1,68 @@
 <%- include('../shared/header') %>
 <h1>Shop</h1>
 
+<form method="GET" class="filters" style="display:flex; gap:12px; margin-bottom:16px; align-items:center;">
+  <input type="text" name="q" value="<%= q || '' %>" placeholder="Search title or SKU" />
+  <select name="cat">
+    <option value="">All categories</option>
+    <% (cats || []).forEach(c => { %>
+      <option value="<%= c._id %>" <%= String(cat||'')===String(c._id)?'selected':'' %>><%= c.name %></option>
+    <% }) %>
+  </select>
+  <select name="sort">
+    <option value="new"        <%= sort==='new'?'selected':'' %>>Newest</option>
+    <option value="price_asc"  <%= sort==='price_asc'?'selected':'' %>>Price: Low → High</option>
+    <option value="price_desc" <%= sort==='price_desc'?'selected':'' %>>Price: High → Low</option>
+  </select>
+  <button class="btn" type="submit">Apply</button>
+</form>
+
+<div class="muted" style="margin-bottom:12px;">
+  <%= total %> result<%= total===1?'':'s' %>
+</div>
+
 <div class="grid">
   <% const list = Array.isArray(products) ? products : []; %>
-
   <% if (!list.length) { %>
     <p>No products yet.</p>
   <% } %>
 
-  <% list.forEach(p => { %>
+  <% list.forEach(p => {
+       const img = (p.images && p.images[0]) || 'https://via.placeholder.com/600x400?text=Product';
+       const inStock = Number(p.stockQty || 0) > 0;
+       const link = `/products/${p.slug}`;
+  %>
     <div class="card">
-      <img src="<%= p.images?.[0] || 'https://via.placeholder.com/400x300?text=Product' %>" alt="<%= p.title %>">
-      <h3><%= p.title %></h3>
-      <p class="price">₺ <%= Number(p.price ?? 0).toFixed(2) %></p>
-
-      <% if ((p.stockQty ?? 0) > 0) { %>
-        <form method="POST" action="/cart/add/<%= p._id %>">
-          <input type="hidden" name="qty" value="1">
-          <button type="submit">Add to cart</button>
-        </form>
-      <% } else { %>
-        <button type="button" disabled>Out of stock</button>
-      <% } %>
+      <a href="<%= link %>"><img src="<%= img %>" alt="<%= p.title %>"></a>
+      <div class="pad">
+        <h3><a href="<%= link %>"><%= p.title %></a></h3>
+        <div class="muted">SKU <%= p.sku %></div>
+        <div class="price">₺ <%= Number(p.price || 0).toFixed(2) %></div>
+      </div>
+      <div class="actions">
+        <% if (inStock) { %>
+          <form method="POST" action="/cart/add/<%= p._id %>" style="flex:1">
+            <input type="hidden" name="qty" value="1">
+            <button class="btn btn--brand" type="submit">Add to cart</button>
+          </form>
+          <a href="<%= link %>" class="btn">Details</a>
+        <% } else { %>
+          <button class="btn" type="button" disabled>Out of stock</button>
+        <% } %>
+      </div>
     </div>
   <% }) %>
 </div>
+
+<% if (pages > 1) { %>
+  <div class="pagination" style="margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;">
+    <% for (let p=1; p<=pages; p++) { %>
+      <a class="btn <%= p===page?'active':'' %>"
+         href="?q=<%= q || '' %>&cat=<%= cat || '' %>&sort=<%= sort || 'new' %>&page=<%= p %>">
+        <%= p %>
+      </a>
+    <% } %>
+  </div>
+<% } %>
 
 <%- include('../shared/footer') %>

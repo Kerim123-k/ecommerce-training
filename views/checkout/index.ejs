@@ -1,33 +1,52 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Checkout' }) %>
+
 <h1>Checkout</h1>
 
-<% if ((addresses || []).length) { %>
-  <form id="checkoutForm" method="POST" action="/checkout">
-    <label>Shipping address</label>
-    <select name="addressId">
-      <% addresses.forEach(a => { %>
-        <option value="<%= a._id %>" <%= a.isDefault ? 'selected' : '' %>>
-          <%= a.fullName %> — <%= a.line1 %>, <%= a.city %> (<%= a.country %>)
-        </option>
-      <% }) %>
-    </select>
-
-    <h3>Cart</h3>
-    <% const list = (cart && cart.items) || []; %>
-    <% if (!list.length) { %>
-      <p>Your cart is empty.</p>
-    <% } else { %>
-      <ul>
-        <% list.forEach(i => { %>
-          <li><%= i.qty %> × <%= i.title %> — ₺ <%= Number(i.unitPrice).toFixed(2) %></li>
-        <% }) %>
-      </ul>
-      <p><strong>Subtotal:</strong> ₺ <%= Number(subTotal).toFixed(2) %></p>
-      <button type="submit">Pay now (mock)</button>
-    <% } %>
-  </form>
+<% if (!addresses || !addresses.length) { %>
+  <div class="alert alert-warning">
+    You don’t have a saved address yet.
+    <a class="btn" href="/account/addresses/new">Add new address</a>
+  </div>
 <% } else { %>
-  <p>No saved addresses. <a href="/account/addresses/new">Add one</a></p>
+  <form method="POST" action="/checkout" class="card pad" style="max-width:760px;">
+    <h3>Shipping address</h3>
+
+    <div class="vstack" style="gap:10px; margin:10px 0 18px;">
+      <% addresses.forEach((a, i) => { %>
+        <label class="card pad" style="display:flex; gap:12px; align-items:flex-start;">
+          <input type="radio" name="addressId" value="<%= a._id %>" <%= a.isDefault || i===0 ? 'checked' : '' %> />
+          <div>
+            <strong><%= a.label || (a.fullName || (a.firstName || '') + ' ' + (a.lastName || '')) %></strong><br>
+            <div class="muted">
+              <%= a.line1 %><% if (a.line2) { %>, <%= a.line2 %><% } %>, <%= a.city %> <%= a.postalCode || '' %>, <%= a.country || 'TR' %><br>
+              <%= a.phone || '' %>
+            </div>
+            <% if (a.isDefault) { %><span class="badge">Default</span><% } %>
+          </div>
+        </label>
+      <% }) %>
+    </div>
+
+    <h3>Order summary</h3>
+    <div class="vstack" style="gap:8px;">
+      <% (cart.items || []).forEach(i => { %>
+        <div class="hstack" style="justify-content:space-between;">
+          <div><%= i.title %> × <%= i.qty %></div>
+          <div>₺ <%= (i.qty * i.unitPrice).toFixed(2) %></div>
+        </div>
+      <% }) %>
+      <hr>
+      <div class="hstack" style="justify-content:space-between;">
+        <strong>Subtotal</strong>
+        <strong>₺ <%= Number(cart.subtotal || 0).toFixed(2) %></strong>
+      </div>
+    </div>
+
+    <div class="hstack" style="gap:12px; margin-top:16px;">
+      <a class="btn" href="/cart">Back to cart</a>
+      <button class="btn btn--brand" type="submit" style="margin-left:auto;">Place order</button>
+    </div>
+  </form>
 <% } %>
 
 <%- include('../shared/footer') %>

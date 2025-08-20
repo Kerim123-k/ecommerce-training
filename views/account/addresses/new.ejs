@@ -1,6 +1,16 @@
 <%- include('../../shared/header') %>
 <h1>Add Address</h1>
-<% if (errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert-error">
+    <ul>
+      <% errors.forEach(e => { %>
+        <li><%= e.msg %></li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
 <form method="POST" action="/account/addresses" class="form">
   <label>Label <input name="label" value="<%= (values && values.label) || '' %>"></label>
   <label>Line 1* <input name="line1" required value="<%= (values && values.line1) || '' %>"></label>
@@ -12,4 +22,5 @@
   <label>Phone <input name="phone" value="<%= (values && values.phone) || '' %>"></label>
   <button type="submit">Save</button>
 </form>
+
 <%- include('../../shared/footer') %>
