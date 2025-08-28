@@ -1,36 +1,43 @@
-<%- include('../shared/header', { title: 'Pay by card (Demo)' }) %>
+,<%- include('../shared/header', { title: 'Pay by card (Demo)' }) %>
 
 <h1>Pay by card (Demo)</h1>
 <p class="muted">This is a demo form—no real charges are made.</p>
 
-<form method="POST" action="/checkout/card" class="vstack" style="gap:12px; max-width:980px;">
-  <!-- keep these across the POST -->
-  <input type="hidden" name="shippingMethod" value="<%= selectedShipping %>">
-  <input type="hidden" name="discount" value="<%= Number(totals.discount||0) %>">
+<% if (errors && errors.length) { %>
+  <div class="alert-error">
+    <ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul>
+  </div>
+<% } %>
 
-  <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-    <label>Cardholder name*<input name="name" value="<%= (values && values.name) || '' %>" required></label>
-    <label>Card number*<input name="number" placeholder="4242 4242 4242 4242" value="<%= (values && values.number) || '' %>" required></label>
-    <label>Exp. month*<input name="expMonth" placeholder="MM" value="<%= (values && values.expMonth) || '' %>" required></label>
-    <label>Exp. year*<input name="expYear" placeholder="YY" value="<%= (values && values.expYear) || '' %>" required></label>
-    <label>CVV*<input name="cvv" placeholder="123" value="<%= (values && values.cvv) || '' %>" required></label>
+<form method="POST" action="/checkout/card?method=<%= selectedShipping %>">
+  <div class="grid" style="grid-template-columns:1fr 1fr; gap:12px; max-width:900px;">
+    <label>Cardholder name*
+      <input name="name" value="<%= values.name || '' %>" required>
+    </label>
+    <label>Card number*
+      <input name="number" value="<%= values.number || '4242 4242 4242 4242' %>" required>
+    </label>
+    <label>Exp. month*
+      <input name="expMonth" value="<%= values.expMonth || '' %>" placeholder="MM" required>
+    </label>
+    <label>Exp. year*
+      <input name="expYear" value="<%= values.expYear || '' %>" placeholder="YY" required>
+    </label>
+    <label>CVV*
+      <input name="cvv" value="<%= values.cvv || '' %>" placeholder="123" required>
+    </label>
   </div>
 
-  <% if (errors && errors.length) { %>
-    <div class="alert-error">
-      <ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul>
-    </div>
-  <% } %>
-
-  <h2>Order summary</h2>
-  <div class="card" style="padding:12px; max-width:560px;">
+  <h2 style="margin-top:16px;">Order summary</h2>
+  <div class="card pad" style="max-width:560px;">
     <div class="hstack" style="justify-content:space-between;">
       <span>Subtotal</span><strong>₺ <%= totals.subtotal.toFixed(2) %></strong>
     </div>
 
     <% if (Number(totals.discount || 0) > 0) { %>
       <div class="hstack" style="justify-content:space-between;">
-        <span>Discount</span><span>- ₺ <%= Number(totals.discount).toFixed(2) %></span>
+        <span>Discount <%= appliedCoupon && appliedCoupon.code ? '('+ appliedCoupon.code +')' : '' %></span>
+        <span>- ₺ <%= Number(totals.discount).toFixed(2) %></span>
       </div>
     <% } %>
 
@@ -39,16 +46,15 @@
     </div>
     <div class="hstack" style="justify-content:space-between;">
       <span>Shipping</span>
-      <span>₺ <%= totals.shipping.toFixed(2) %> (<%= (selectedShipping || totals.shippingMethod || 'standard') %>)</span>
+      <span>₺ <%= totals.shipping.toFixed(2) %> (<%= shippingLabel || selectedShipping %>)</span>
     </div>
-    <hr>
-    <div class="hstack" style="justify-content:space-between; font-weight:600;">
+    <div class="hstack" style="justify-content:space-between; font-weight:600; font-size:1.1rem;">
       <span>Total</span><strong>₺ <%= totals.grandTotal.toFixed(2) %></strong>
     </div>
   </div>
 
-  <div class="hstack" style="gap:10px;">
-    <a class="btn" href="/checkout">Back</a>
+  <div class="hstack" style="gap:10px; margin-top:12px;">
+    <a class="btn" href="/checkout?method=<%= selectedShipping %>">Back</a>
     <button class="btn btn--brand" type="submit">Pay ₺ <%= totals.grandTotal.toFixed(2) %></button>
   </div>
 </form>

@@ -2,9 +2,14 @@
 
 <h1>Checkout</h1>
 
-<% if (typeof flash === 'string' && flash) { %>
-  <div class="alert"><%= flash %></div>
+<% if (flash) { %>
+  <div class="alert-error" style="margin-bottom:12px;"><%= flash %></div>
 <% } %>
+
+<%
+// from controller:
+// addresses, cart, totals, shippingMethods, selectedShipping, appliedCoupon
+%>
 
 <% if (!addresses || !addresses.length) { %>
   <div class="alert alert-warning">
@@ -12,108 +17,160 @@
     <a class="btn" href="/account/addresses/new">Add new address</a>
   </div>
 <% } else { %>
-  <div class="card pad" style="max-width:820px;">
-    <!-- ADDRESS + SHIPPING + ORDER SUMMARY live here -->
-    <form method="POST" action="/checkout" id="place-order-form">
-      <h3>Shipping address</h3>
-      <div class="vstack" style="gap:10px; margin:10px 0 18px;">
-        <% addresses.forEach((a, i) => { %>
-          <label class="card pad" style="display:flex; gap:12px; align-items:flex-start;">
-            <input type="radio" name="addressId" value="<%= a._id %>" <%= a.isDefault || i===0 ? 'checked' : '' %> />
-            <div>
-              <strong><%= a.label || (a.fullName || (a.firstName || '') + ' ' + (a.lastName || '')) %></strong><br>
-              <div class="muted">
-                <%= a.line1 %><% if (a.line2) { %>, <%= a.line2 %><% } %>, <%= a.city %> <%= a.postalCode || '' %>, <%= a.country || 'TR' %><br>
-                <%= a.phone || '' %>
-              </div>
-              <% if (a.isDefault) { %><span class="badge">Default</span><% } %>
+
+  <!-- MAIN CHECKOUT FORM -->
+  <form method="POST" action="/checkout" class="card pad" id="checkout-form" style="max-width:760px;">
+
+    <h3>Shipping address</h3>
+    <div class="vstack" style="gap:10px; margin:10px 0 18px;">
+      <% addresses.forEach((a, i) => { %>
+        <label class="card pad" style="display:flex; gap:12px; align-items:flex-start;">
+          <input type="radio" name="addressId" value="<%= a._id %>" <%= a.isDefault || i===0 ? 'checked' : '' %> />
+          <div>
+            <strong><%= a.label || (a.fullName || (a.firstName || '') + ' ' + (a.lastName || '')) %></strong><br>
+            <div class="muted">
+              <%= a.line1 %><% if (a.line2) { %>, <%= a.line2 %><% } %>, <%= a.city %> <%= a.postalCode || '' %>, <%= a.country || 'TR' %><br>
+              <%= a.phone || '' %>
             </div>
-          </label>
-        <% }) %>
+            <% if (a.isDefault) { %><span class="badge">Default</span><% } %>
+          </div>
+        </label>
+      <% }) %>
+    </div>
+
+    <h3>Shipping method</h3>
+    <select name="shippingMethod" id="shippingMethod">
+      <% (shippingMethods || []).forEach(m => { %>
+        <option value="<%= m.code %>" <%= m.code === selectedShipping ? 'selected' : '' %>>
+          <%= m.label %> <% if (m.cost) { %>(₺ <%= m.cost.toFixed(2) %>)<% } %>
+        </option>
+      <% }) %>
+    </select>
+
+    <!-- COUPON AREA (IN THE SAME FORM) -->
+    <h3 style="margin-top:16px;">Discount</h3>
+
+    <% if (appliedCoupon && appliedCoupon.code) { %>
+      <div class="hstack" style="gap:10px; align-items:center;">
+        <div>Applied: <strong><%= appliedCoupon.code %></strong></div>
+        <!-- Remove coupon: same form, different action -->
+        <button type="submit"
+                class="btn"
+                formaction="/checkout/coupon/remove"
+                formmethod="POST">
+          Remove
+        </button>
+      </div>
+    <% } else { %>
+      <div class="hstack" style="gap:8px; align-items:center;">
+        <input type="text"
+               name="coupon"
+               placeholder="Coupon code (optional)"
+               style="max-width:240px;">
+        <!-- APPLY goes to /checkout/coupon/apply instead of /checkout -->
+        <button type="submit"
+                class="btn"
+                formaction="/checkout/coupon/apply"
+                formmethod="POST">
+          Apply
+        </button>
+      </div>
+    <% } %>
+
+    <h3 style="margin-top:16px;">Order summary</h3>
+    <div class="vstack" style="gap:8px;">
+      <% (cart.items || []).forEach(i => { %>
+        <div class="hstack" style="justify-content:space-between;">
+          <div><%= i.title %> × <%= i.qty %></div>
+          <div>₺ <%= (i.qty * i.unitPrice).toFixed(2) %></div>
+        </div>
+      <% }) %>
+      <hr>
+      <div class="hstack" style="justify-content:space-between;">
+        <div>Subtotal</div>
+        <div>₺ <%= totals.subtotal.toFixed(2) %></div>
       </div>
 
-      <h3>Shipping method</h3>
-      <select name="shippingMethod" id="shipping-select">
-        <% (shippingMethods || []).forEach(m => { %>
-          <option value="<%= m.code %>" <%= m.code === selectedShipping ? 'selected' : '' %>>
-            <%= m.label %> <% if (m.cost) { %>(₺ <%= m.cost.toFixed(2) %>)<% } %>
-          </option>
-        <% }) %>
-      </select>
-
-      <!-- We also mirror shipping choice into the session by reloading on change -->
-      <script>
-      (function () {
-        const s = document.getElementById('shipping-select');
-        if (!s) return;
-        s.addEventListener('change', function () {
-          const u = new URL(window.location.href);
-          u.searchParams.set('method', s.value);
-          window.location.assign(u.toString());
-        });
-      })();
-      </script>
-
-      <h3 style="margin-top:16px;">Discount</h3>
-      <% if (appliedCoupon && appliedCoupon.code) { %>
-        <div class="hstack" style="gap:10px; align-items:center;">
-          <div>Applied: <strong><%= appliedCoupon.code %></strong></div>
-          <form method="POST" action="/checkout/coupon/remove" style="display:inline;">
-            <button class="btn btn--sm" type="submit">Remove</button>
-          </form>
+      <% const _discount = Number(totals.discount || 0); %>
+      <% if (_discount > 0) { %>
+        <div class="hstack" style="justify-content:space-between;">
+          <div>Discount</div>
+          <div>- ₺ <%= _discount.toFixed(2) %></div>
         </div>
-      <% } else { %>
-        <!-- SEPARATE FORM so Apply doesn't place the order -->
-        <form method="POST" action="/checkout/coupon/apply" class="hstack" style="gap:8px; margin-bottom:8px;">
-          <input type="text" name="coupon" placeholder="Coupon code" style="max-width:240px;" />
-          <button class="btn" type="submit">Apply</button>
-        </form>
       <% } %>
 
-      <h3 style="margin-top:16px;">Order summary</h3>
-      <div class="vstack" style="gap:8px;">
-        <% (cart.items || []).forEach(i => { 
-             const line = Number(i.unitPrice||0) * Number(i.qty||1);
-        %>
-          <div class="hstack" style="justify-content:space-between;">
-            <div><%= i.title %> × <%= i.qty %></div>
-            <div>₺ <%= line.toFixed(2) %></div>
-          </div>
-        <% }) %>
-        <hr>
-        <div class="hstack" style="justify-content:space-between;">
-          <div>Subtotal</div>
-          <div>₺ <%= totals.subtotal.toFixed(2) %></div>
-        </div>
-
-        <% if (Number(totals.discount||0) > 0) { %>
-          <div class="hstack" style="justify-content:space-between;">
-            <div>Discount</div>
-            <div>- ₺ <%= Number(totals.discount).toFixed(2) %></div>
-          </div>
-        <% } %>
-
-        <div class="hstack" style="justify-content:space-between;">
-          <div>Tax</div>
-          <div>₺ <%= totals.tax.toFixed(2) %></div>
-        </div>
-        <div class="hstack" style="justify-content:space-between;">
-          <div>Shipping</div>
-          <div>₺ <%= totals.shippingCost.toFixed(2) %> (<%= totals.shippingMethod %>)</div>
-        </div>
-        <div class="hstack" style="justify-content:space-between; font-weight:600; font-size:1.1rem;">
-          <div>Total</div>
-          <div>₺ <%= totals.grandTotal.toFixed(2) %></div>
-        </div>
+      <div class="hstack" style="justify-content:space-between;">
+        <div>Tax</div>
+        <div data-totals-tax>₺ <%= totals.tax.toFixed(2) %></div>
       </div>
-
-      <div class="hstack" style="gap:12px; margin-top:16px;">
-        <a class="btn" href="/cart">Back to cart</a>
-        <button class="btn" type="submit" style="margin-left:auto;">Place order</button>
-        <a class="btn btn--brand" href="/checkout/card?method=<%= totals.shippingMethod %>">Pay with card (Demo)</a>
+      <div class="hstack" style="justify-content:space-between;">
+        <div>Shipping</div>
+        <div data-totals-shipping>₺ <%= (totals.shippingCost ?? totals.shipping).toFixed(2) %></div>
       </div>
-    </form>
-  </div>
+      <div class="hstack" style="justify-content:space-between; font-weight:600; font-size:1.1rem;">
+        <div>Total</div>
+        <div data-totals-grand>₺ <%= totals.grandTotal.toFixed(2) %></div>
+      </div>
+    </div>
+
+    <div class="hstack" style="gap:12px; margin-top:16px;">
+      <a class="btn" href="/cart">Back to cart</a>
+
+      <!-- Place order (bank/cod), uses the default action="/checkout" -->
+      <button class="btn" type="submit" style="margin-left:auto;">Place order</button>
+
+      <!-- Demo card checkout: link updated by JS to include shipping -->
+      <a class="btn btn--brand" id="cardLink" href="/checkout/card?method=<%= selectedShipping %>">
+        Pay with card (Demo)
+      </a>
+    </div>
+  </form>
 <% } %>
+
+<script>
+(function () {
+  const methods   = <%- JSON.stringify(shippingMethods || []) %>;
+  const subtotal  = Number(<%- (totals && totals.subtotal) || 0 %>);
+  const baseTax   = Number(<%- (totals && totals.tax) || 0 %>);
+  const discount  = Number(<%- (totals && totals.discount) || 0 %>);
+  const taxableBase = Math.max(0, subtotal - discount);
+  const taxRate     = taxableBase > 0 ? (baseTax / taxableBase) : 0;
+
+  const sel     = document.getElementById('shippingMethod');
+  const elTax   = document.querySelector('[data-totals-tax]');
+  const elShip  = document.querySelector('[data-totals-shipping]');
+  const elGrand = document.querySelector('[data-totals-grand]');
+  const cardLink = document.getElementById('cardLink');
+
+  function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
+
+  function pickShipping(code, sub) {
+    let m = methods.find(x => x.code === code) || methods[0];
+    if (m && m.code === 'free' && sub < (m.minSubtotal || Infinity)) m = methods[0];
+    return m || { code: 'standard', cost: 0 };
+  }
+
+  function recalc() {
+    const methodCode = sel ? sel.value : (methods[0] && methods[0].code);
+    const m = pickShipping(methodCode, subtotal);
+    const eligibleFree = (m.code === 'free') && subtotal >= (m.minSubtotal || Infinity);
+    const shipCost = eligibleFree ? 0 : Number(m.cost || 0);
+
+    const tax = round2(taxableBase * taxRate);
+    const grand = round2(taxableBase + tax + shipCost);
+
+    if (elTax)   elTax.textContent   = '₺ ' + tax.toFixed(2);
+    if (elShip)  elShip.textContent  = '₺ ' + shipCost.toFixed(2);
+    if (elGrand) elGrand.textContent = '₺ ' + grand.toFixed(2);
+
+    if (cardLink) cardLink.href = '/checkout/card?method=' + encodeURIComponent(methodCode);
+  }
+
+  if (sel) {
+    sel.addEventListener('change', recalc);
+    recalc();
+  }
+})();
+</script>
 
 <%- include('../shared/footer') %>

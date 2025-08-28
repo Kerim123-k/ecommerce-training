@@ -3,48 +3,20 @@ const Product  = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order    = require('../models/Order');
 
-// ---- Email helpers (safe no-op fallback if the service file is missing) ----
-let sendOrderConfirmation = async () => {};
-try {
-  ({ sendOrderConfirmation } = require('../services/orderEmails'));
-} catch (e) {
-  console.warn('[payment.controller] orderEmails service not found; emails disabled.');
-}
-
 const TAX_RATE = Number(process.env.TAX_RATE || 0);
 
-// Same shipping options you show on checkout
 const SHIPPING_METHODS = [
   { code: 'standard', label: 'Standard (2–4 days)', cost: 49 },
   { code: 'express',  label: 'Express (1–2 days)',  cost: 99 },
   { code: 'free',     label: 'Free shipping (≥ ₺200)', cost: 0, minSubtotal: 200 },
 ];
 
-function calcTotals(cart, shipCode, discountAmount = 0) {
-  const subtotal = Number(
-    (cart.items || []).reduce((s, i) => s + Number(i.qty || 0) * Number(i.unitPrice || 0), 0).toFixed(2)
-  );
-
-  let m = SHIPPING_METHODS.find(x => x.code === shipCode) || SHIPPING_METHODS[0];
+function pickShipping(code, subtotal) {
+  let m = SHIPPING_METHODS.find(x => x.code === code) || SHIPPING_METHODS[0];
   if (m.code === 'free' && subtotal < (m.minSubtotal || Infinity)) m = SHIPPING_METHODS[0];
-
-  const shipping = Number((m.code === 'free' ? 0 : m.cost || 0));
-  const discount = Math.max(0, Math.min(Number(discountAmount || 0), subtotal));
-  const taxable  = Math.max(0, subtotal - discount);
-  const tax      = Number((taxable * TAX_RATE).toFixed(2));
-  const grand    = Number((taxable + tax + shipping).toFixed(2));
-
-  return {
-    subtotal,
-    discount,
-    tax,
-    shipping,
-    shippingMethod: m.code,
-    grandTotal: grand
-  };
+  return m;
 }
 
-// Minimal Luhn check (demo)
 function luhnOK(num) {
   const s = String(num || '').replace(/\D/g, '');
   if (s.length < 12) return false;
@@ -62,50 +34,72 @@ exports.cardForm = (req, res) => {
   const cart = req.session?.cart || { items: [], subtotal: 0 };
   if (!cart.items.length) return res.redirect('/cart');
 
-  const ck = req.session.checkout || {};
-  const selectedShipping = (req.query.method || ck.shippingMethod || 'standard').trim();
+  const selectedShipping = req.query.method || 'standard';
 
-  // accept ?d=<discount> (fallback to session)
-  const discount = (req.query.d != null)
-    ? Number(req.query.d)
-    : Number(ck.discount || 0);
+  const subtotal = Number(
+    (cart.items || []).reduce((s, i) => s + Number(i.qty || 0) * Number(i.unitPrice || 0), 0).toFixed(2)
+  );
 
-  const totals = calcTotals(cart, selectedShipping, discount);
+  const coupon = req.session.checkout?.coupon || null;
+  let discount = 0;
+  if (coupon) {
+    const kind = (coupon.kind || coupon.type || '').toLowerCase();
+    const val  = Number(coupon.value || 0);
+    if (kind === 'percent' || kind === 'percentage') {
+      discount = Number((subtotal * Math.max(0, Math.min(100, val)) / 100).toFixed(2));
+    } else {
+      discount = Math.min(subtotal, Number(val.toFixed(2)));
+    }
+  }
+
+  const taxableBase = Math.max(0, subtotal - discount);
+  const tax  = Number((taxableBase * TAX_RATE).toFixed(2));
+  const ship = pickShipping(selectedShipping, subtotal);
+  const shippingCost = ship.code === 'free' ? 0 : Number(ship.cost || 0);
+  const grandTotal = Number((taxableBase + tax + shippingCost).toFixed(2));
 
   res.render('checkout/card', {
     cart,
-    totals,
-    shippingMethods: SHIPPING_METHODS,
     selectedShipping,
+    shippingLabel: ship.label,
+    totals: { subtotal, discount, tax, shipping: shippingCost, grandTotal },
+    appliedCoupon: coupon || null,
     errors: [],
     values: {}
   });
 };
 
-/* ------------- POST: accept card + create a Paid order (demo) ------------- */
+/* ------------- POST: accept card + create Paid order (demo) ------------- */
 exports.cardCharge = async (req, res, next) => {
   try {
     const cart = req.session?.cart || { items: [] };
     if (!cart.items.length) return res.redirect('/cart');
 
     const {
-      name = '',
-      number = '',
-      expMonth = '',
-      expYear = '',
-      cvv = '',
-      shippingMethod = (req.session.checkout && req.session.checkout.shippingMethod) || 'standard',
-
-      // hidden field from the card page
-      discount: postedDiscount
+      name = '', number = '', expMonth = '', expYear = '', cvv = '',
     } = req.body;
 
-    // pull discount again (prefer POST hidden field; fallback session)
-    const discount = (postedDiscount != null)
-      ? Number(postedDiscount)
-      : Number(req.session.checkout?.discount || 0);
+    const selectedShipping = req.query.method || 'standard';
 
-    const totals = calcTotals(cart, shippingMethod, discount);
+    const subtotal = Number(
+      (cart.items || []).reduce((s, i) => s + Number(i.qty || 0) * Number(i.unitPrice || 0), 0).toFixed(2)
+    );
+
+    const coupon = req.session.checkout?.coupon || null;
+    let discount = 0;
+    if (coupon) {
+      const kind = (coupon.kind || coupon.type || '').toLowerCase();
+      const val  = Number(coupon.value || 0);
+      discount = (kind === 'percent' || kind === 'percentage')
+        ? Number((subtotal * Math.max(0, Math.min(100, val)) / 100).toFixed(2))
+        : Math.min(subtotal, Number(val.toFixed(2)));
+    }
+
+    const taxableBase = Math.max(0, subtotal - discount);
+    const tax  = Number((taxableBase * TAX_RATE).toFixed(2));
+    const ship = pickShipping(selectedShipping, subtotal);
+    const shippingCost = ship.code === 'free' ? 0 : Number(ship.cost || 0);
+    const grandTotal = Number((taxableBase + tax + shippingCost).toFixed(2));
 
     const errors = [];
     if (!name.trim()) errors.push({ msg: 'Cardholder name is required.' });
@@ -117,15 +111,16 @@ exports.cardCharge = async (req, res, next) => {
     if (errors.length) {
       return res.status(400).render('checkout/card', {
         cart,
-        totals,
-        shippingMethods: SHIPPING_METHODS,
-        selectedShipping: shippingMethod,
+        selectedShipping,
+        shippingLabel: ship.label,
+        totals: { subtotal, discount, tax, shipping: shippingCost, grandTotal },
+        appliedCoupon: coupon || null,
         errors,
         values: req.body
       });
     }
 
-    // Resolve default shipping address (if logged in)
+    // Resolve default address (if logged in)
     const userId = req.session?.user?._id || null;
     let shippingAddress = null;
     if (userId) {
@@ -133,20 +128,16 @@ exports.cardCharge = async (req, res, next) => {
       const addr = (me?.addresses || []).find(a => a.isDefault) || (me?.addresses || [])[0];
       if (addr) {
         shippingAddress = {
-          firstName: addr.firstName,
-          lastName:  addr.lastName,
-          line1:     addr.line1,
-          line2:     addr.line2 || '',
-          city:      addr.city,
-          province:  addr.province || '',
-          postalCode:addr.postalCode || '',
-          country:   addr.country || 'TR',
-          phone:     addr.phone || ''
+          firstName: addr.firstName, lastName: addr.lastName,
+          line1: addr.line1, line2: addr.line2 || '',
+          city: addr.city, province: addr.province || '',
+          postalCode: addr.postalCode || '', country: addr.country || 'TR',
+          phone: addr.phone || ''
         };
       }
     }
 
-    // Validate items against DB (status/stock)
+    // Validate items against DB
     const ids = cart.items.map(i => i.productId);
     const dbProducts = await Product.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
     const items = cart.items.map(i => {
@@ -156,17 +147,16 @@ exports.cardCharge = async (req, res, next) => {
       return { productId: p._id, sku: p.sku, title: p.title, qty: i.qty, unitPrice: p.price };
     });
 
-    // Create order as Paid (demo)
     const order = await Order.create({
       orderNo: 'ORD-' + Math.floor(Date.now() / 1000),
       customerId: userId,
       customerEmail: req.session?.user?.email || '',
       items,
-      subtotal: totals.subtotal,
-      discount: totals.discount,        // keep the discount on the order
-      shipping: totals.shipping,
-      tax: totals.tax,
-      grandTotal: totals.grandTotal,
+      subtotal,
+      discount,
+      tax,
+      shipping: shippingCost,
+      grandTotal,
       shippingAddress,
       status: 'Paid',
       paymentMethod: 'Card (Demo)',
@@ -174,10 +164,7 @@ exports.cardCharge = async (req, res, next) => {
       timeline: [{ at: new Date(), status: 'Paid', note: 'Paid via Demo Card' }]
     });
 
-    // Fire-and-forget confirmation email
-    sendOrderConfirmation(order).catch(() => {});
-
-    // Decrement stock
+    // decrement stock
     await Promise.all(items.map(it =>
       Product.updateOne(
         { _id: it.productId, trackInventory: true },
@@ -185,9 +172,9 @@ exports.cardCharge = async (req, res, next) => {
       )
     ));
 
-    // Clear cart/session checkout state and redirect
+    // clear cart & coupon
     req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
-    delete req.session.checkout;
+    if (req.session.checkout) delete req.session.checkout.coupon;
 
     res.redirect(`/account/orders/${order._id}`);
   } catch (e) { next(e); }
