@@ -1,0 +1,43 @@
+<%- include('../shared/header') %>
+<h1>Order <%= order.orderNo || order._id %></h1>
+
+<p>
+  <strong>Status:</strong> <%= order.status %><br/>
+  <strong>Customer:</strong> <%= order.customerEmail || '-' %><br/>
+  <strong>Placed:</strong> <%= new Date(order.createdAt).toLocaleString() %>
+</p>
+
+<h3>Items</h3>
+<table class="table">
+  <thead>
+    <tr><th>SKU</th><th>Title</th><th>Qty</th><th>Unit</th><th>Line</th></tr>
+  </thead>
+  <tbody>
+    <% (order.items || []).forEach(i => { 
+         const line = Number(i.qty) * Number(i.unitPrice || 0);
+    %>
+      <tr>
+        <td><%= i.sku %></td>
+        <td><%= i.title %></td>
+        <td><%= i.qty %></td>
+        <td>₺ <%= Number(i.unitPrice || 0).toFixed(2) %></td>
+        <td>₺ <%= Number(line).toFixed(2) %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+
+<%
+  const sub = order.totals?.subTotal ?? order.subtotal ?? 0;
+  const grand = order.totals?.grandTotal ?? order.grandTotal ?? sub;
+%>
+<p><strong>Subtotal:</strong> ₺ <%= Number(sub).toFixed(2) %><br/>
+<strong>Total:</strong> ₺ <%= Number(grand).toFixed(2) %></p>
+
+<p><a href="/admin/orders">← Back to list</a></p>
+<%- include('../shared/footer') %>
+
+<form method="POST" action="/admin/orders/<%= order._id %>/mark-paid" style="display:inline;">
+  <button class="btn">Mark as Paid</button>
+</form>
+

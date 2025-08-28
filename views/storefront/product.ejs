@@ -1,0 +1,41 @@
+<%- include('../shared/header') %>
+
+<% const p = product; %>
+<article class="product-page">
+  <div class="product-media">
+    <img src="<%= (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product' %>" alt="<%= p.title %>">
+  </div>
+
+  <div class="product-info">
+    <h1><%= p.title %></h1>
+    <div class="muted">SKU <%= p.sku %></div>
+    <div class="price" style="font-size:1.5rem; font-weight:700; margin:8px 0;">
+      ₺ <%= Number(p.price || 0).toFixed(2) %>
+    </div>
+
+    <% const inStock = Number(p.stockQty || 0) > 0; %>
+    <div class="muted" style="margin-bottom:12px;">
+      <%= inStock ? (p.stockQty + ' in stock') : 'Out of stock' %>
+    </div>
+
+    <% if (inStock) { %>
+      <form method="POST" action="/cart/add/<%= p._id %>" class="actions" style="display:flex; gap:8px;">
+        <input type="number" name="qty" min="1" max="<%= p.stockQty %>" value="1" style="width:80px;">
+        <button class="btn btn--brand" type="submit">Add to cart</button>
+      </form>
+    <% } else { %>
+      <button class="btn" type="button" disabled>Out of stock</button>
+    <% } %>
+
+    <% if ((p.categories || []).length) { %>
+      <div style="margin-top:16px;">
+        <span class="muted">Categories:</span>
+        <% p.categories.forEach((c, i) => { %>
+          <span><%= c.name %><%= i < p.categories.length - 1 ? ', ' : '' %></span>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</article>
+
+<%- include('../shared/footer') %>

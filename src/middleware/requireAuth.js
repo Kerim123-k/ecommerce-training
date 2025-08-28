@@ -1,18 +1,16 @@
 // src/middleware/requireAuth.js
 module.exports = (req, res, next) => {
-  // Accept any of these shapes (session or Passport)
+  // Accept common session/passport shapes
   const userId =
-    req.session?.user?._id ||
+    (req.session && req.session.user && req.session.user._id) ||
     req.session?.userId ||
     req.user?._id;
 
   if (userId) return next();
 
-  // Allow auth pages themselves (prevents redirect loops)
+  // Avoid redirect loops for auth pages
   const p = req.path || '';
-  if (p === '/auth/login' || p.startsWith('/auth/')) {
-    return next();
-  }
+  if (p === '/auth/login' || p.startsWith('/auth/')) return next();
 
   // Remember where to return after login
   if (req.method === 'GET') req.session.returnTo = req.originalUrl;

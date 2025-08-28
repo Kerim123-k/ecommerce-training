@@ -1,5 +1,21 @@
 <%- include('../shared/header', { title: 'Thank you' }) %>
 <h1>Thank you!</h1>
-<p>Your order has been placed. You can review it in <a href="/account/orders">My Orders</a>.</p>
-<p><a class="btn btn--brand" href="/products">Continue shopping</a></p>
+<p>Your order has been received.</p>
+
+<% if (bankInfo) { %>
+  <div class="card pad" style="margin-top:12px;">
+    <h3>Bank Transfer Instructions</h3>
+    <p>Please transfer the total to:</p>
+    <ul>
+      <li><strong>Bank:</strong> <%= bankInfo.bankName %></li>
+      <li><strong>Account Name:</strong> <%= bankInfo.accountName %></li>
+      <li><strong>IBAN:</strong> <%= bankInfo.iban %></li>
+      <% if (bankInfo.bic) { %><li><strong>BIC/SWIFT:</strong> <%= bankInfo.bic %></li><% } %>
+      <li><strong>Reference:</strong> <%= bankInfo.reference %></li>
+    </ul>
+    <p>After payment, upload your receipt on the order page so we can verify it quickly.</p>
+    <p><a class="btn" href="/account/orders">Go to My Orders</a></p>
+  </div>
+<% } %>
+
 <%- include('../shared/footer') %>

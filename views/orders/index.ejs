@@ -1,0 +1,72 @@
+<%- include('../shared/header') %>
+<h1>Orders</h1>
+
+<form method="GET" class="filters" style="display:flex; gap:12px; margin: 0 0 16px; flex-wrap: wrap; align-items:center;">
+  <input type="text" name="q" value="<%= q || '' %>" placeholder="Search order no or email" />
+  <select name="status">
+    <option value="">All statuses</option>
+    <% ['Paid','Processing','Shipped','Delivered','Cancelled'].forEach(s => { %>
+      <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
+    <% }) %>
+  </select>
+  <label>From <input type="date" name="from" value="<%= from || '' %>"></label>
+  <label>To <input type="date" name="to" value="<%= to || '' %>"></label>
+  <button class="btn" type="submit">Apply</button>
+
+  <!-- CSV export keeps current filters -->
+  <a class="btn" href="/admin/orders/export.csv?<%= [
+      'q=' + encodeURIComponent(q || ''),
+      'status=' + encodeURIComponent(status || ''),
+      'from=' + encodeURIComponent(from || ''),
+      'to=' + encodeURIComponent(to || '')
+    ].join('&') %>">Export CSV</a>
+</form>
+
+<div class="muted" style="margin-bottom:12px;">
+  <%= total || 0 %> result<%= (total||0)===1 ? '' : 's' %>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Order #</th>
+      <th>Created</th>
+      <th>Status</th>
+      <th>Customer</th>
+      <th>Items</th>
+      <th>Total</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% (orders || []).forEach(o => { 
+         const itemsCount = Array.isArray(o.items) ? o.items.reduce((n,i)=>n+Number(i.qty||0),0) : 0;
+    %>
+      <tr>
+        <td><%= o.orderNo %></td>
+        <td><%= new Date(o.createdAt).toLocaleString() %></td>
+        <td><%= o.status %></td>
+        <td><%= o.customerEmail || '-' %></td>
+        <td><%= itemsCount %></td>
+        <td>₺ <%= Number(o.grandTotal || 0).toFixed(2) %></td>
+        <td><a class="btn" href="/admin/orders/<%= o._id %>">View</a></td>
+      </tr>
+    <% }) %>
+    <% if (!(orders||[]).length) { %>
+      <tr><td colspan="7" class="muted">No orders found.</td></tr>
+    <% } %>
+  </tbody>
+</table>
+
+<% if ((pages || 1) > 1) { %>
+  <div class="pagination" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+    <% for (let i = 1; i <= pages; i++) { %>
+      <a class="btn <%= (i===page)?'active':'' %>"
+         href="?q=<%= encodeURIComponent(q||'') %>&status=<%= encodeURIComponent(status||'') %>&from=<%= encodeURIComponent(from||'') %>&to=<%= encodeURIComponent(to||'') %>&page=<%= i %>&per=<%= per || 20 %>">
+        <%= i %>
+      </a>
+    <% } %>
+  </div>
+<% } %>
+
+<%- include('../shared/footer') %>

@@ -1,148 +1,160 @@
 // src/controllers/order.controller.js
-const crypto = require('crypto');
-const Product = require('../models/Product');
-const Order = require('../models/Order');
+const crypto   = require('crypto');
+const path     = require('path');
+const Product  = require('../models/Product');
+const Order    = require('../models/Order');
 const Customer = require('../models/Customer');
 
-// const Customer = require('../models/Customer'); // uncomment if/when you use it
+// ---- Email helpers (safe fallback if missing) ----
+let sendOrderConfirmation = async () => {};
+let sendOrderStatus = async () => {};
+try {
+  ({ sendOrderConfirmation, sendOrderStatus } = require('../services/orderEmails'));
+} catch (e) {
+  console.warn('[order.controller] orderEmails service not found; emails disabled.');
+}
 
-function orderNo() {
+function makeOrderNo() {
   return `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
-// ---------- Customer checkout flow ----------
-exports.checkoutForm = (req, res) => {
-  const cart = req.session.cart || { items: [], subtotal: 0 };
-  if (!cart.items.length) return res.redirect('/cart');
-  res.render('checkout/index', { cart, errors: [], values: {} });
-};
-
-exports.checkout = async (req, res, next) => {
+/* =========================
+   Customer: My Orders
+   ========================= */
+async function myOrders(req, res, next) {
   try {
-    const cart = req.session.cart || { items: [], subtotal: 0 };
-    if (!cart.items.length) return res.redirect('/cart');
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
 
-    // 🔒 Block suspended accounts
-    if (req.session.user?._id) {
-      const me = await Customer.findById(req.session.user._id).lean();
-      if (me && me.status === 'Suspended') {
-        return res.status(403).render('checkout/index', {
-          cart,
-          errors: [{ msg: 'Your account is suspended. Please contact support.' }],
-          values: req.body
-        });
-      }
+    const orders = await Order.find({ customerId: uid })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.render('account/orders/index', { orders });
+  } catch (e) { next(e); }
+}
+
+async function myOrderShow(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const o = await Order.findOne({ _id: req.params.id, customerId: uid }).lean();
+    if (!o) return res.status(404).send('Order not found');
+
+    const total =
+      (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
+      o.grandTotal ?? o.subtotal ?? 0;
+
+    res.render('account/orders/show', { order: o, normalizedTotal: Number(total) });
+  } catch (e) { next(e); }
+}
+
+/* =========================
+   Customer: upload receipt (bank transfer)
+   ========================= */
+async function uploadReceipt(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const o = await Order.findOne({ _id: req.params.id, customerId: uid });
+    if (!o) return res.status(404).send('Order not found');
+
+    if (!req.file || !req.file.path) {
+      req.session.flash = 'No file uploaded.';
+      return res.redirect(`/account/orders/${o._id}`);
     }
+    const rel = req.file.path.split(path.sep + 'public' + path.sep)[1];
+    const url = '/' + String(rel || '').replace(/\\/g, '/');
 
-    // Stock & availability check
-    const ids = cart.items.map(i => i.productId);
-    const dbProducts = await Product.find({ _id: { $in: ids } });
-    for (const i of cart.items) {
-      const p = dbProducts.find(dp => String(dp._id) === String(i.productId));
-      if (!p || p.status !== 'Active') {
-        return res.status(400).render('checkout/index', {
-          cart, errors: [{ msg: `${i.title} unavailable` }], values: req.body
-        });
-      }
-      if (p.trackInventory && p.stockQty < i.qty) {
-        return res.status(400).render('checkout/index', {
-          cart, errors: [{ msg: `Not enough stock for ${i.title}` }], values: req.body
-        });
-      }
-    }
-
-    // ... (rest of your order creation, stock decrement, clear cart, redirect)
-
-
-    // Build order
-    const shippingAddress = {
-      firstName: req.body.firstName, lastName: req.body.lastName,
-      line1: req.body.line1, line2: req.body.line2 || '',
-      city: req.body.city, province: req.body.province || '',
-      postalCode: req.body.postalCode || '', country: req.body.country || 'TR',
-      phone: req.body.phone || ''
-    };
-    const subtotal = cart.subtotal;
-    const shipping = 0, tax = 0;
-    const grandTotal = Number((subtotal + shipping + tax).toFixed(2));
-    const custId = req.session.user?._id || null;
-    const custEmail = req.session.user?.email || req.body.email;
-
-    const order = await Order.create({
-      orderNo: orderNo(),
-      customerId: custId, customerEmail: custEmail,
-      items: cart.items,
-      subtotal, shipping, tax, grandTotal,
-      shippingAddress,
-      status: 'Paid',
-      paymentMethod: 'Mock',
-      paymentStatus: 'Paid'
+    o.timeline = o.timeline || [];
+    o.timeline.push({
+      at: new Date(),
+      status: o.status || 'New',
+      note: `Customer uploaded receipt: ${url}`
     });
+    if (!o.paymentMethod) o.paymentMethod = 'Bank Transfer';
+    if (!o.paymentStatus || o.paymentStatus === 'Pending') {
+      o.paymentStatus = 'Pending';
+    }
+    await o.save();
 
-    // Decrement stock
-    await Promise.all(cart.items.map(i =>
-      Product.updateOne(
-        { _id: i.productId, trackInventory: true },
-        { $inc: { stockQty: -i.qty } }
-      )
-    ));
-
-    // Clear cart
-    req.session.cart = { items: [], itemCount: 0, subtotal: 0 };
-
-    res.redirect(`/order/${order._id}/thank-you`);
+    req.session.flash = 'Receipt uploaded. We will verify your payment shortly.';
+    res.redirect(`/account/orders/${o._id}`);
   } catch (e) { next(e); }
-};
+}
 
-exports.thankYou = async (req, res, next) => {
+/* =========================
+   Admin: list/show/actions
+   ========================= */
+async function adminList(req, res, next) {
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).send('Order not found');
-    res.render('orders/thankyou', { order });
-  } catch (e) { next(e); }
-};
-
-// ---------- Admin: list & detail/actions ----------
-exports.adminList = async (req, res, next) => {
-  try {
-    const { q = '', status = '', page = 1 } = req.query;
-    const limit = 20;
+    const { q = '', status = '', page = 1, from = '', to = '' } = req.query;
+    const limit = 10;
     const match = {};
-    if (q) match.$or = [
-      { orderNo: new RegExp(q, 'i') },
-      { customerEmail: new RegExp(q, 'i') }
-    ];
+
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(safe, 'i');
+      match.$or = [
+        { orderNo: rx },
+        { customerEmail: rx },
+        { 'items.sku': rx },
+        { 'items.title': rx },
+      ];
+    }
     if (status) match.status = status;
 
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = new Date(from);
+      if (to) {
+        const end = new Date(to);
+        end.setDate(end.getDate() + 1);
+        end.setHours(0, 0, 0, 0);
+        match.createdAt.$lt = end;
+      }
+    }
+
+    const pg = Math.max(1, parseInt(page, 10) || 1);
+
     const [orders, total] = await Promise.all([
-      Order.find(match).sort({ createdAt: -1 }).skip((page-1)*limit).limit(limit),
-      Order.countDocuments(match)
+      Order.find(match)
+        .sort({ createdAt: -1 })
+        .skip((pg - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(match),
     ]);
+
+    const pages = Math.max(1, Math.ceil(total / limit));
 
     res.render('orders/admin_index', {
       orders,
-      q, status,
-      page: Number(page),
-      pages: Math.ceil(total / limit)
+      q, status, from, to,
+      page: pg,
+      pages,
+      total,
     });
   } catch (e) { next(e); }
-};
+}
 
+async function adminShow(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).send('Order not found');
+    return res.render('orders/show', { order });
+  } catch (e) { next(e); }
+}
 
+// Timeline helper
 function pushTimeline(order, status, note = '') {
   order.timeline = order.timeline || [];
   order.timeline.push({ status, note, at: new Date() });
 }
 
-exports.adminShow = async (req, res, next) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).send('Order not found');
-    res.render('orders/admin_show', { order });
-  } catch (e) { next(e); }
-};
-
-exports.adminProcess = async (req, res, next) => {
+async function adminProcess(req, res, next) {
   try {
     const o = await Order.findById(req.params.id);
     if (!o) return res.status(404).send('Order not found');
@@ -152,11 +164,13 @@ exports.adminProcess = async (req, res, next) => {
     o.status = 'Processing';
     pushTimeline(o, 'Processing', 'Moved to processing');
     await o.save();
+
+    sendOrderStatus(o, 'Processing').catch(() => {});
     res.redirect(`/admin/orders/${o._id}`);
   } catch (e) { next(e); }
-};
+}
 
-exports.adminShip = async (req, res, next) => {
+async function adminShip(req, res, next) {
   try {
     const { carrier, trackingNumber } = req.body;
     const o = await Order.findById(req.params.id);
@@ -168,11 +182,13 @@ exports.adminShip = async (req, res, next) => {
     o.status = 'Shipped';
     pushTimeline(o, 'Shipped', `Carrier: ${carrier || '-'}, Tracking: ${trackingNumber || '-'}`);
     await o.save();
+
+    sendOrderStatus(o, 'Shipped').catch(() => {});
     res.redirect(`/admin/orders/${o._id}`);
   } catch (e) { next(e); }
-};
+}
 
-exports.adminDeliver = async (req, res, next) => {
+async function adminDeliver(req, res, next) {
   try {
     const o = await Order.findById(req.params.id);
     if (!o) return res.status(404).send('Order not found');
@@ -182,18 +198,19 @@ exports.adminDeliver = async (req, res, next) => {
     o.status = 'Delivered';
     pushTimeline(o, 'Delivered', 'Delivered to customer');
     await o.save();
+
+    sendOrderStatus(o, 'Delivered').catch(() => {});
     res.redirect(`/admin/orders/${o._id}`);
   } catch (e) { next(e); }
-};
+}
 
-exports.adminCancel = async (req, res, next) => {
+async function adminCancel(req, res, next) {
   try {
     const o = await Order.findById(req.params.id);
     if (!o) return res.status(404).send('Order not found');
     if (['Shipped', 'Delivered', 'Cancelled'].includes(o.status)) {
       return res.redirect(`/admin/orders/${o._id}`);
     }
-    // restore stock
     await Promise.all(o.items.map(i =>
       Product.updateOne(
         { _id: i.productId, trackInventory: true },
@@ -204,6 +221,155 @@ exports.adminCancel = async (req, res, next) => {
     o.paymentStatus = 'Refunded'; // mock
     pushTimeline(o, 'Cancelled', 'Cancelled by admin; stock restored; payment refunded (mock)');
     await o.save();
+
+    sendOrderStatus(o, 'Cancelled').catch(() => {});
     res.redirect(`/admin/orders/${o._id}`);
   } catch (e) { next(e); }
+}
+
+async function adminMarkPaid(req, res, next) {
+  try {
+    const o = await Order.findById(req.params.id);
+    if (!o) return res.status(404).send('Order not found');
+
+    o.paymentStatus = 'Paid';
+    if (!o.paymentMethod) o.paymentMethod = 'Manual';
+    if (o.status === 'New' || !o.status) o.status = 'Paid';
+    pushTimeline(o, 'Paid', 'Marked paid by admin');
+    await o.save();
+
+    sendOrderStatus(o, 'Paid').catch(() => {});
+    res.redirect(`/admin/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+async function adminExportCsv(req, res, next) {
+  try {
+    const { q = '', status = '', from = '', to = '' } = req.query;
+
+    const match = {};
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(safe, 'i');
+      match.$or = [
+        { orderNo: rx },
+        { customerEmail: rx },
+        { 'items.sku': rx },
+        { 'items.title': rx },
+      ];
+    }
+    if (status) match.status = status;
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = new Date(from);
+      if (to) {
+        const end = new Date(to);
+        end.setDate(end.getDate() + 1);
+        end.setHours(0, 0, 0, 0);
+        match.createdAt.$lt = end;
+      }
+    }
+
+    const orders = await Order.find(match).sort({ createdAt: -1 }).lean();
+
+    const csvEsc = v => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const header = ['orderNo','createdAt','customerEmail','itemCount','grandTotal','status'];
+    const lines = [header.join(',')];
+
+    for (const o of orders) {
+      const itemCount = (o.items || []).reduce((n, i) => n + (i.qty || 1), 0);
+      const totalVal =
+        (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
+        o.grandTotal ?? o.subtotal ?? 0;
+
+      lines.push([
+        csvEsc(o.orderNo || o._id),
+        csvEsc(new Date(o.createdAt).toISOString()),
+        csvEsc(o.customerEmail || ''),
+        csvEsc(itemCount),
+        csvEsc(Number(totalVal).toFixed(2)),
+        csvEsc(o.status || '')
+      ].join(','));
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
+    res.send(lines.join('\n'));
+  } catch (e) { next(e); }
+}
+
+async function adminDashboard(_req, res, next) {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(todayStart);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const readTotal = (o) =>
+      (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
+      o.grandTotal ?? o.subtotal ?? 0;
+
+    const todays = await Order.find({ createdAt: { $gte: todayStart, $lt: tomorrow } }).lean();
+    const todayOrders = todays.length;
+    const todayRevenue = todays.reduce((s, o) => s + Number(readTotal(o) || 0), 0);
+
+    const statusAgg = await Order.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]);
+    const statusCounts = Object.fromEntries(statusAgg.map(r => [r._id || 'Unknown', r.n]));
+
+    const lowStock = await Product.find({
+      status: 'Active',
+      isDeleted: { $ne: true },
+      stockQty: { $lte: 5 }
+    })
+      .sort({ stockQty: 1, createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 7);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const topProducts = await Order.aggregate([
+      { $match: { createdAt: { $gte: weekStart } } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: { sku: '$items.sku', title: '$items.title' },
+          qty: { $sum: '$items.qty' },
+          revenue: { $sum: { $multiply: ['$items.qty', '$items.unitPrice'] } }
+        }
+      },
+      { $sort: { qty: -1 } },
+      { $limit: 5 }
+    ]);
+
+    res.render('admin/dashboard', {
+      todayOrders,
+      todayRevenue,
+      statusCounts,
+      lowStock,
+      topProducts,
+      weekStart
+    });
+  } catch (e) { next(e); }
+}
+
+module.exports = {
+  myOrders,
+  myOrderShow,
+  uploadReceipt,
+  adminList,
+  adminShow,
+  adminProcess,
+  adminShip,
+  adminDeliver,
+  adminCancel,
+  adminExportCsv,
+  adminDashboard,
+  adminMarkPaid,
 };

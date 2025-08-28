@@ -1,0 +1,30 @@
+<%- include('../shared/header', { title: 'Coupons' }) %>
+<h1>Coupons</h1>
+<p><a class="btn" href="/admin/coupons/new">New coupon</a></p>
+
+<table class="table">
+  <thead>
+    <tr><th>Code</th><th>Type</th><th>Value</th><th>Min subtotal</th><th>Window</th><th>Active</th><th>Uses</th><th></th></tr>
+  </thead>
+  <tbody>
+    <% (coupons || []).forEach(c => { %>
+      <tr>
+        <td><strong><%= c.code %></strong></td>
+        <td><%= c.type %></td>
+        <td><%= c.value %></td>
+        <td><%= c.minSubtotal || 0 %></td>
+        <td class="muted">
+          <%= c.startsAt ? new Date(c.startsAt).toLocaleDateString() : '-' %> →
+          <%= c.endsAt ? new Date(c.endsAt).toLocaleDateString() : '-' %>
+        </td>
+        <td><%= c.active ? 'Yes' : 'No' %></td>
+        <td><%= c.usedCount || 0 %><%= c.maxUses ? (' / ' + c.maxUses) : '' %></td>
+        <td class="hstack" style="gap:8px;">
+          <form method="POST" action="/admin/coupons/<%= c._id %>/toggle"><button class="btn btn--sm"><%= c.active ? 'Deactivate' : 'Activate' %></button></form>
+          <form method="POST" action="/admin/coupons/<%= c._id %>/delete" onsubmit="return confirm('Delete coupon?')"><button class="btn btn--sm">Delete</button></form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('../shared/footer') %>

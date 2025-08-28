@@ -31,8 +31,14 @@ const orderSchema = new Schema({
   paymentStatus: { type: String, enum: ['Pending','Paid','Refunded'], default: 'Pending' },
   tracking: { number: String, carrier: String },
 timeline: [{ at: { type: Date, default: Date.now }, status: String, note: String }],
+// inside orderSchema:
+shippingMethod: { type: String, default: 'standard' }, // NEW
+
 
   notes: String
 }, { timestamps: true });
+
+
+
 
 module.exports = model('Order', orderSchema);

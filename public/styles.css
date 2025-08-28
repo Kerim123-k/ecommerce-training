@@ -148,4 +148,16 @@ input:focus, select:focus, textarea:focus{
 @media (max-width: 900px) {
   .product-detail { grid-template-columns: 1fr; }
 }
+.btn--icon { display:inline-flex; align-items:center; gap:6px; }
+.btn--icon .heart { font-size:18px; line-height:1; }
+.card { position: relative; }
+.wish-btn { position:absolute; top:8px; right:8px; }
+.wish-btn button{
+  width:36px; height:36px;
+  border-radius:999px;
+  border:1px solid #eee;
+  background:#fff; cursor:pointer;
+  font-size:18px; line-height:1;
+}
+.wish-btn button:hover{ background:#ffe7ea; }
 

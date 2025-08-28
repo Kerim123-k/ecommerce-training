@@ -1,0 +1,41 @@
+<%- include('../shared/header') %>
+<h1>My Wishlist</h1>
+
+<% const list = Array.isArray(products) ? products : []; %>
+<% if (!list.length) { %>
+  <p class="muted">Your wishlist is empty.</p>
+  <p><a class="btn" href="/products">Browse products</a></p>
+<% } else { %>
+  <div class="grid">
+    <% list.forEach(p => {
+         let img = (Array.isArray(p.images) && p.images[0]) || p.image || '';
+         if (img && img.startsWith('//')) img = 'https:' + img;
+         if (img && img.startsWith('http://')) img = img.replace(/^http:\/\//,'https://');
+         const href = (p.slug && String(p.slug).trim()) ? '/p/' + p.slug : '/products/id/' + p._id;
+    %>
+      <div class="card">
+        <a href="<%= href %>"><img src="<%= img %>" alt="<%= p.title %>"></a>
+        <div class="pad">
+          <h3><a href="<%= href %>"><%= p.title %></a></h3>
+          <div class="muted">SKU <%= p.sku %></div>
+          <div class="price">₺ <%= Number(p.price || 0).toFixed(2) %></div>
+        </div>
+        <div class="actions">
+          <form method="POST" action="/cart/add/<%= p._id %>" style="display:inline;">
+            <input type="hidden" name="qty" value="1">
+            <button class="btn btn--brand" type="submit">Add to cart</button>
+          </form>
+          <form method="POST" action="/wishlist/remove/<%= p._id %>" style="display:inline;">
+            <button class="btn" type="submit">Remove</button>
+          </form>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <form method="POST" action="/wishlist/clear" style="margin-top:16px;">
+    <button class="btn" type="submit">Clear all</button>
+  </form>
+<% } %>
+
+<%- include('../shared/footer') %>

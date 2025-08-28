@@ -7,17 +7,19 @@
   </div>
 <% } %>
 
-<form method="POST" action="/admin/products" class="form">
+<form method="POST" action="/admin/products" enctype="multipart/form-data" class="form">
   <label>Title* <input name="title" value="<%= (values && values.title) || '' %>" required></label>
   <label>SKU* <input name="sku" value="<%= (values && values.sku) || '' %>" required></label>
   <label>Price* <input type="number" step="0.01" min="0" name="price" value="<%= (values && values.price) || '' %>" required></label>
   <label>Stock* <input type="number" min="0" name="stockQty" value="<%= (values && values.stockQty) || '' %>" required></label>
+
   <label>Status
     <select name="status">
-      <option <%= values && values.status==='Draft' ? 'selected' : '' %>>Draft</option>
-      <option <%= values && values.status==='Active' ? 'selected' : '' %>>Active</option>
+      <option value="Draft"  <%= values && values.status==='Draft'  ? 'selected' : '' %>>Draft</option>
+      <option value="Active" <%= values && values.status==='Active' ? 'selected' : '' %>>Active</option>
     </select>
   </label>
+
   <label>Category
     <select name="categories" multiple>
       <% const selectedCats = Array.isArray(values && values.categories) ? values.categories.map(String) : (values && values.categories ? [String(values.categories)] : []); %>
@@ -26,8 +28,20 @@
       <% }) %>
     </select>
   </label>
-  <label>Image URL <input name="image" value="<%= (values && values.image) || '' %>" placeholder="https://..."></label>
+
+  <fieldset style="margin:10px 0; padding:10px; border:1px solid #eee; border-radius:8px;">
+    <legend>Product images</legend>
+    <label>Image URL
+      <input name="image" value="<%= (values && values.image) || '' %>" placeholder="https://...">
+    </label>
+    <div class="muted" style="margin:6px 0;">or</div>
+    <label>Upload image
+      <input type="file" name="imageFile" accept="image/*">
+    </label>
+    <div class="muted" style="margin-top:6px;">You can provide either a URL or upload a file. If both are provided, both will be saved.</div>
+  </fieldset>
+
   <button type="submit">Save</button>
 </form>
-<%- include('../shared/footer') %>
 
+<%- include('../shared/footer') %>

@@ -1,0 +1,29 @@
+<%- include('../shared/header') %>
+<h1>Low stock report</h1>
+
+<form method="GET" style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+  <label>Threshold
+    <input type="number" min="0" name="t" value="<%= threshold %>" style="width:90px">
+  </label>
+  <button class="btn" type="submit">Apply</button>
+</form>
+
+<table class="table">
+  <thead>
+    <tr><th>SKU</th><th>Title</th><th>Stock</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <% if (!products.length) { %>
+      <tr><td colspan="4" class="muted">Nothing is low on stock 🎉</td></tr>
+    <% } %>
+    <% products.forEach(p => { %>
+      <tr>
+        <td><%= p.sku %></td>
+        <td><%= p.title %></td>
+        <td><strong><%= p.stockQty %></strong></td>
+        <td><%= p.status %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('../shared/footer') %>

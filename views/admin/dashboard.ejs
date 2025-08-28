@@ -1,0 +1,71 @@
+<%- include('../shared/header') %>
+<h1>Admin · Dashboard</h1>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin-bottom:20px;">
+  <div class="card pad">
+    <div class="muted">Orders Today</div>
+    <div style="font-size:28px; font-weight:700;"><%= todayOrders %></div>
+  </div>
+  <div class="card pad">
+    <div class="muted">Revenue Today</div>
+    <div style="font-size:28px; font-weight:700;">₺ <%= Number(todayRevenue).toFixed(2) %></div>
+  </div>
+  <div class="card pad">
+    <div class="muted">Status Counts</div>
+    <ul style="margin:8px 0 0 0; padding-left:16px;">
+      <% Object.keys(statusCounts).sort().forEach(s => { %>
+        <li><strong><%= s %></strong>: <%= statusCounts[s] %></li>
+      <% }) %>
+    </ul>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 1fr 1fr; gap:16px;">
+  <div class="card pad">
+    <h3 style="margin-top:0;">Low Stock (≤5)</h3>
+    <% if (!lowStock || !lowStock.length) { %>
+      <p class="muted">No low-stock products.</p>
+    <% } else { %>
+      <div style="overflow:auto;">
+        <table class="table">
+          <thead><tr><th>SKU</th><th>Title</th><th>Stock</th></tr></thead>
+          <tbody>
+            <% lowStock.forEach(p => { %>
+              <tr>
+                <td><%= p.sku %></td>
+                <td><%= p.title %></td>
+                <td><%= p.stockQty %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card pad">
+    <h3 style="margin-top:0;">Top Products (last 7 days)</h3>
+    <% if (!topProducts || !topProducts.length) { %>
+      <p class="muted">No sales in the last 7 days.</p>
+    <% } else { %>
+      <div style="overflow:auto;">
+        <table class="table">
+          <thead><tr><th>SKU</th><th>Title</th><th>Qty</th><th>Revenue</th></tr></thead>
+          <tbody>
+            <% topProducts.forEach(t => { %>
+              <tr>
+                <td><%= t._id?.sku || '-' %></td>
+                <td><%= t._id?.title || '-' %></td>
+                <td><%= t.qty %></td>
+                <td>₺ <%= Number(t.revenue || 0).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+    <div class="muted" style="margin-top:8px;">From <%= new Date(weekStart).toLocaleDateString() %> to today</div>
+  </div>
+</div>
+
+<%- include('../shared/footer') %>

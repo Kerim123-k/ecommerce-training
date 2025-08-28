@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <body style="font-family:system-ui,Segoe UI,Arial,sans-serif;">
+    <h2>Thank you! We received your order <%= order.orderNo || order._id %>.</h2>
+
+    <p>Items:</p>
+    <ul>
+      <% (order.items || []).forEach(i => { %>
+        <li><%= i.title %> × <%= i.qty %> — ₺ <%= (Number(i.unitPrice||0)*Number(i.qty||1)).toFixed(2) %></li>
+      <% }) %>
+    </ul>
+
+    <p>
+      Subtotal: ₺ <%= Number(order.subtotal||0).toFixed(2) %><br>
+      Shipping: ₺ <%= Number(order.shipping||0).toFixed(2) %><br>
+      Tax: ₺ <%= Number(order.tax||0).toFixed(2) %><br>
+      <strong>Total: ₺ <%= Number(order.grandTotal||0).toFixed(2) %></strong>
+    </p>
+
+    <% if ((order.paymentMethod||'').toLowerCase().includes('bank')) { %>
+      <hr>
+      <p><strong>Bank transfer instructions</strong> (use your order number as reference).</p>
+    <% } %>
+
+    <p>You can view your order any time here:</p>
+    <p><a href="<%= (process.env.APP_URL || 'http://localhost:3000') %>/account/orders/<%= order._id %>">Order details</a></p>
+  </body>
+</html>

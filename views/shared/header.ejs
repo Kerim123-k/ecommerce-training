@@ -12,9 +12,13 @@
       <a href="/products">Storefront</a>
 
       <% if (currentUser && currentUser.role === 'Admin') { %>
-        <a href="/admin/products">Admin: Products</a>
-        <a href="/admin/categories">Admin: Categories</a>
-        <a href="/admin/orders">Admin: Orders</a>
+    
+        <a href="/admin/reviews">Admin: Reviews</a>
+        <a href="/admin/dashboard">Admin: Dashboard</a>
+  <a href="/admin/products">Admin: Products</a>
+  <a href="/admin/categories">Admin: Categories</a>
+    <a href="/admin/coupons">Admin: Coupons</a>
+  <a href="/admin/orders">Admin: Orders</a>
       <% } %>
 
       <span class="spacer"></span>
@@ -22,6 +26,19 @@
       <a href="/cart" class="btn">Cart <span class="badge"><%= cartCount %></span></a>
 
       <% if (currentUser) { %>
+          <!-- Wishlist (single heart icon with count) -->
+<a href="/wishlist" class="btn" title="Wishlist">
+  <span class="heart-icon <%= (wishlistCount||0) > 0 ? 'has-items' : '' %>" aria-hidden="true">♥</span>
+  <span class="badge" data-wishlist-count><%= wishlistCount || 0 %></span>
+</a>
+
+<style>
+  .heart-icon { font-size: 16px; color: #888; margin-right: 6px; }
+  .heart-icon.has-items { color: #e0245e; }
+</style>
+
+
+
         <a href="/account/orders" class="btn">My Orders</a>
         <a href="/account/addresses" class="btn">My Addresses</a>
         <span class="small">Hello, <%= currentUser.name || currentUser.email %></span>

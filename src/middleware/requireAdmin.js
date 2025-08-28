@@ -1,11 +1,18 @@
-// src/middleware/requireAdmin.js
-module.exports = (req, res, next) => {
-  const user = req.session?.user;
-  if (user?.role === 'Admin') return next();
+// Guards admin-only pages.
+// If not logged in, redirect to login and remember returnTo.
+// If logged in but not Admin, return 403.
 
-  if (!user) {
+module.exports = (req, res, next) => {
+  const user = req.session?.user || req.user || null;
+
+  if (!user?._id) {
     if (req.method === 'GET') req.session.returnTo = req.originalUrl;
     return res.redirect('/auth/login');
   }
-  return res.status(403).send('Forbidden');
+
+  if ((user.role || 'User') !== 'Admin') {
+    return res.status(403).send('Forbidden');
+  }
+
+  next();
 };

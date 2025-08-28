@@ -1,29 +1,106 @@
+<!-- views/cart/index.ejs -->
 <%- include('../shared/header') %>
-<h1>Your Cart</h1>
-<% if (!cart.items.length) { %>
-  <p>Cart is empty.</p>
-<% } else { %>
-<table>
-  <thead><tr><th>Item</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
-  <tbody>
-  <% cart.items.forEach(i => { %>
-    <tr>
-      <td><%= i.title %> (<%= i.sku %>)</td>
-      <td>₺ <%= i.unitPrice.toFixed(2) %></td>
-      <td>
-        <form method="POST" action="/cart/update">
-          <input type="hidden" name="id" value="<%= i.productId %>">
-          <input type="number" name="qty" min="0" value="<%= i.qty %>" style="width:60px">
-          <button type="submit">Update</button>
-        </form>
-      </td>
-      <td>₺ <%= (i.qty*i.unitPrice).toFixed(2) %></td>
-    </tr>
-  <% }) %>
-  </tbody>
-</table>
-<p><strong>Subtotal:</strong> ₺ <%= cart.subtotal.toFixed(2) %></p>
-<form method="POST" action="/cart/clear"><button type="submit">Clear Cart</button></form>
-<p><a href="/checkout">Proceed to Checkout</a></p>
+
+<h1>Cart</h1>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="alert alert-success" style="margin-bottom:12px;"><%= flash %></div>
 <% } %>
+
+<%
+  const items = (cart && Array.isArray(cart.items)) ? cart.items : [];
+%>
+
+<% if (!items.length) { %>
+  <p class="muted">Your cart is empty.</p>
+  <p><a class="btn" href="/products">Continue shopping</a></p>
+<% } else { %>
+
+  <!-- Update all quantities in one form -->
+  <form method="POST" action="/cart/update">
+    <table class="table" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Product</th>
+          <th style="text-align:left;">Price</th>
+          <th style="text-align:left;">Qty</th>
+          <th style="text-align:left;">Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% items.forEach((it, i) => {
+           const unit = Number(it.unitPrice || 0);
+           const qty  = Number(it.qty || 0);
+           const line = unit * qty;
+           let thumb = it.image || '';
+           if (thumb && thumb.startsWith('//')) thumb = 'https:' + thumb;
+           if (thumb && thumb.startsWith('http://')) thumb = thumb.replace(/^http:\/\//,'https://');
+           const href = it.href || (it.slug ? '/p/' + it.slug : '/products/id/' + it.productId);
+      %>
+        <tr style="border-top:1px solid #eee;">
+          <td style="padding:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <% if (thumb) { %>
+                <img src="<%= thumb %>" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;">
+              <% } %>
+              <div>
+                <div><a href="<%= href %>"><%= it.title %></a></div>
+                <div class="muted">SKU <%= it.sku %></div>
+              </div>
+            </div>
+          </td>
+
+          <td style="padding:10px;">₺ <%= unit.toFixed(2) %></td>
+
+          <td style="padding:10px;">
+            <!-- name shape that controller.update expects -->
+            <input type="hidden" name="items[<%= i %>][id]"  value="<%= it.productId %>">
+            <input type="number"
+                   name="items[<%= i %>][qty]"
+                   min="0"
+                   value="<%= qty %>"
+                   style="width:70px;">
+          </td>
+
+          <td style="padding:10px;">₺ <%= line.toFixed(2) %></td>
+
+          <td style="padding:10px;">
+            <!-- This submits the whole form, but also includes only this button's name/value -->
+  <button class="btn"
+          type="submit"
+          name="removeId"
+          value="<%= it.productId %>"
+          formnovalidate>
+    Remove
+  </button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+
+    <div style="margin-top:14px; display:flex; gap:12px;">
+      <button class="btn" type="submit">Update cart</button>
+      <a class="btn" href="/products">Continue shopping</a>
+    </div>
+  </form>
+
+  <div style="margin-top:24px;">
+    <form method="POST" action="/cart/clear">
+      <button class="btn" type="submit">Clear cart</button>
+    </form>
+  </div>
+
+  <!-- Summary -->
+  <div style="margin-top:24px; text-align:right;">
+    <div class="muted">Subtotal</div>
+    <div style="font-size:1.25rem;">₺ <%= Number(cart && cart.subtotal || 0).toFixed(2) %></div>
+    <div class="muted" style="font-size:.9rem;margin-top:4px;">Tax/shipping at checkout</div>
+    <a class="btn btn--brand" href="/checkout" style="margin-top:8px;display:inline-block;">Checkout</a>
+  </div>
+
+<% } %>
+
 <%- include('../shared/footer') %>

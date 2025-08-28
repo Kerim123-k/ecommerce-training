@@ -1,0 +1,88 @@
+<%- include('../shared/header') %>
+<h1>Admin · Reviews</h1>
+
+<form method="GET" class="filters" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-bottom:16px;">
+  <div>
+    <label>Status</label>
+    <select name="status">
+      <option value="">All</option>
+      <% ['Pending','Approved','Rejected'].forEach(s => { %>
+        <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label>Search</label>
+    <input type="text" name="q" value="<%= q || '' %>" placeholder="email, name, text" />
+  </div>
+  <button class="btn" type="submit">Apply</button>
+  <a class="btn" href="/admin/reviews">Reset</a>
+</form>
+
+<div class="muted" style="margin-bottom:12px;">
+  <%= total || 0 %> result<%= (total||0)===1?'':'s' %>
+</div>
+
+<% if (!rows || !rows.length) { %>
+  <p>No reviews found.</p>
+<% } else { %>
+  <div style="overflow:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Product</th>
+          <th>Reviewer</th>
+          <th>Rating</th>
+          <th>Title</th>
+          <th>Body</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% rows.forEach(rv => { %>
+        <tr>
+          <td><%= new Date(rv.createdAt).toLocaleString() %></td>
+          <td>
+            <% if (rv.productId) { %>
+              <a href="/products/<%= rv.productId.slug %>" target="_blank">
+                <%= rv.productId.title %>
+              </a>
+              <div class="muted">SKU <%= rv.productId.sku %></div>
+            <% } else { %>
+              <span class="muted">—</span>
+            <% } %>
+          </td>
+          <td>
+            <div><%= rv.customerName || '—' %></div>
+            <div class="muted"><%= rv.customerEmail || '—' %></div>
+          </td>
+          <td><strong><%= rv.rating %>/5</strong></td>
+          <td><%= rv.title || '—' %></td>
+          <td style="max-width:420px; white-space:pre-wrap;"><%= rv.body %></td>
+          <td><span class="pill"><%= rv.status %></span></td>
+          <td style="white-space:nowrap;">
+            <form method="POST" action="/admin/reviews/<%= rv._id %>/approve" style="display:inline;">
+              <button class="btn" type="submit">Approve</button>
+            </form>
+            <form method="POST" action="/admin/reviews/<%= rv._id %>/reject" style="display:inline;">
+              <button class="btn" type="submit">Reject</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if ((pages || 1) > 1) { %>
+    <div class="pagination" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+      <% for (let p=1; p<=pages; p++) { %>
+        <a class="btn <%= p===page?'active':'' %>" href="?status=<%= encodeURIComponent(status||'') %>&q=<%= encodeURIComponent(q||'') %>&page=<%= p %>"><%= p %></a>
+      <% } %>
+    </div>
+  <% } %>
+<% } %>
+
+<%- include('../shared/footer') %>

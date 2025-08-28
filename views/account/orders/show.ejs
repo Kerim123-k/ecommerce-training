@@ -1,0 +1,150 @@
+<%- include('../../shared/header') %>
+
+<%
+  // Normalize totals for old/new orders
+  const subtotal = Number(order.subtotal ?? (order.totals && order.totals.subTotal) ?? 0);
+  const tax      = Number(order.tax      ?? (order.totals && order.totals.tax)      ?? 0);
+  const shipping = Number(
+    order.shipping ??
+    (order.totals && (order.totals.shipping ?? order.totals.shippingCost)) ??
+    0
+  );
+  const discount = Number(order.discount || 0);
+  const grand    = Number(
+    (order.grandTotal ?? (order.totals && order.totals.grandTotal) ?? (subtotal - discount + tax + shipping))
+    .toFixed(2)
+  );
+%>
+
+<h1>Order <%= order.orderNo || order._id %></h1>
+<div class="muted" style="margin-bottom:8px;">
+  Placed on <%= new Date(order.createdAt).toLocaleString() %>
+</div>
+
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start;">
+  <!-- Left: items -->
+  <div>
+    <h2 style="margin:8px 0;">Items</h2>
+    <div style="overflow:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th style="text-align:right;">Qty</th>
+            <th style="text-align:right;">Unit</th>
+            <th style="text-align:right;">Line</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (order.items||[]).forEach(i => { 
+               const unit = Number(i.unitPrice||0);
+               const line = unit * Number(i.qty||1);
+          %>
+            <tr>
+              <td><%= i.title %></td>
+              <td class="muted"><%= i.sku %></td>
+              <td style="text-align:right;"><%= i.qty %></td>
+              <td style="text-align:right;">₺ <%= unit.toFixed(2) %></td>
+              <td style="text-align:right;">₺ <%= line.toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+
+      <% if (Array.isArray(order.timeline) && order.timeline.length) { %>
+        <h2 style="margin:16px 0 8px;">Status timeline</h2>
+        <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+          <% order.timeline.forEach(t => { %>
+            <li style="border:1px solid #eee; border-radius:8px; padding:8px;">
+              <strong><%= t.status %></strong>
+              <span class="muted"> · <%= new Date(t.at).toLocaleString() %></span>
+              <% if (t.note) { %><div class="muted"><%= t.note %></div><% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Right: summary & shipping -->
+  <aside>
+    <h2 style="margin:8px 0;">Summary</h2>
+    <div class="card" style="padding:12px;">
+      <div class="row" style="display:flex; justify-content:space-between;">
+        <span>Subtotal</span>
+        <strong>₺ <%= subtotal.toFixed(2) %></strong>
+      </div>
+
+      <% if (discount > 0) { %>
+        <div class="row" style="display:flex; justify-content:space-between;">
+          <span>
+            Discount
+            <%= order.couponCode ? '(' + order.couponCode + ')' : '' %>
+          </span>
+          <span>- ₺ <%= discount.toFixed(2) %></span>
+        </div>
+      <% } %>
+
+      <div class="row" style="display:flex; justify-content:space-between;">
+        <span>Shipping</span><span>₺ <%= shipping.toFixed(2) %></span>
+      </div>
+      <div class="row" style="display:flex; justify-content:space-between;">
+        <span>Tax</span><span>₺ <%= tax.toFixed(2) %></span>
+      </div>
+      <hr/>
+      <div class="row" style="display:flex; justify-content:space-between; font-size:1.1rem;">
+        <span>Total</span>
+        <strong>₺ <%= grand.toFixed(2) %></strong>
+      </div>
+      <div style="margin-top:8px;">
+        <span class="pill"><%= order.status %></span>
+      </div>
+      <% if (order.tracking && (order.tracking.carrier || order.tracking.number)) { %>
+        <div class="muted" style="margin-top:6px;">
+          Tracking: <%= order.tracking.carrier || '-' %> <%= order.tracking.number || '' %>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Receipt upload for Bank Transfer (tolerate both spellings) -->
+    <% const pm = String(order.paymentMethod || ''); %>
+    <% if ((pm === 'Bank Transfer' || pm === 'BankTransfer') && order.paymentStatus !== 'Paid') { %>
+      <div class="card" style="padding:12px; margin-top:12px;">
+        <h3>Bank Transfer</h3>
+        <p class="muted" style="margin-bottom:8px;">
+          Please transfer the total to the provided IBAN and upload your receipt. Use your order number as the reference.
+        </p>
+
+        <form method="POST"
+              action="/account/orders/<%= order._id %>/receipt"
+              enctype="multipart/form-data"
+              class="vstack" style="gap:8px;">
+          <input type="file" name="receipt" accept="image/*,application/pdf" required>
+          <button class="btn" type="submit">Upload receipt</button>
+        </form>
+
+        <% if (order.receipt && order.receipt.url) { %>
+          <p class="muted" style="margin-top:6px;">
+            Uploaded: <a href="<%= order.receipt.url %>" target="_blank" rel="noopener">View receipt</a>
+          </p>
+        <% } %>
+      </div>
+    <% } %>
+
+    <h2 style="margin:16px 0 8px;">Shipping address</h2>
+    <div class="card" style="padding:12px;">
+      <% const a = order.shippingAddress || {}; %>
+      <div><%= [a.firstName, a.lastName].filter(Boolean).join(' ') %></div>
+      <div><%= a.line1 %></div>
+      <% if (a.line2) { %><div><%= a.line2 %></div><% } %>
+      <div><%= [a.city, a.province, a.postalCode].filter(Boolean).join(', ') %></div>
+      <div><%= a.country %></div>
+      <% if (a.phone) { %><div class="muted">☎ <%= a.phone %></div><% } %>
+    </div>
+  </aside>
+</div>
+
+<p style="margin-top:16px;"><a class="btn" href="/account/orders">← Back to My Orders</a></p>
+
+<%- include('../../shared/footer') %>

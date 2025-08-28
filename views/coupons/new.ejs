@@ -1,0 +1,29 @@
+<%- include('../shared/header', { title: 'New Coupon' }) %>
+<h1>New coupon</h1>
+<% if (error) { %><div class="alert-error"><%= error %></div><% } %>
+
+<form method="POST" action="/admin/coupons" class="form" style="max-width:520px;">
+  <label>Code* <input name="code" value="<%= values.code || '' %>" required placeholder="WELCOME10"></label>
+
+  <label>Type*
+    <select name="type" required>
+      <option value="percent" <%= (values.type||'')==='percent'?'selected':'' %>>Percent (%)</option>
+      <option value="amount" <%= (values.type||'')==='amount'?'selected':'' %>>Fixed amount</option>
+    </select>
+  </label>
+
+  <label>Value* <input type="number" step="0.01" min="0" name="value" value="<%= values.value || '' %>" required></label>
+  <label>Min subtotal <input type="number" step="0.01" min="0" name="minSubtotal" value="<%= values.minSubtotal || '' %>"></label>
+
+  <div class="hstack" style="gap:12px;">
+    <label>Starts at <input type="date" name="startsAt" value="<%= values.startsAt || '' %>"></label>
+    <label>Ends at <input type="date" name="endsAt" value="<%= values.endsAt || '' %>"></label>
+  </div>
+
+  <label>Max uses <input type="number" min="0" name="maxUses" value="<%= values.maxUses || '' %>"></label>
+  <label><input type="checkbox" name="active" <%= values.active ? 'checked' : 'checked' %> > Active</label>
+  <label>Notes <textarea name="notes"><%= values.notes || '' %></textarea></label>
+
+  <button class="btn btn--brand">Create</button>
+</form>
+<%- include('../shared/footer') %>

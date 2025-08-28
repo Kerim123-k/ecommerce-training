@@ -1,41 +1,95 @@
+<!-- views/orders/admin_index.ejs -->
 <%- include('../shared/header') %>
-<h1>Orders</h1>
+<h1>Admin · Orders</h1>
 
-<form method="GET" action="/admin/orders" style="margin:10px 0">
-  <input name="q" value="<%= q||'' %>" placeholder="Search order # or email">
-  <select name="status">
-    <option value="">All statuses</option>
-    <% ['New','Paid','Processing','Shipped','Delivered','Cancelled'].forEach(s => { %>
-      <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
-    <% }) %>
-  </select>
-  <button type="submit">Filter</button>
+<!-- Filters -->
+<form method="GET" class="filters" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-bottom:16px;">
+  <div>
+    <label>Search</label>
+    <input type="text" name="q" value="<%= q || '' %>" placeholder="order no, email, sku, title" />
+  </div>
+
+  <div>
+    <label>Status</label>
+    <select name="status">
+      <option value="">All</option>
+      <% ['Paid','Processing','Shipped','Delivered','Cancelled'].forEach(s => { %>
+        <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
+      <% }) %>
+    </select>
+  </div>
+
+  <div>
+    <label>From</label>
+    <input type="date" name="from" value="<%= from || '' %>">
+  </div>
+  <div>
+    <label>To</label>
+    <input type="date" name="to" value="<%= to || '' %>">
+  </div>
+
+  <button class="btn" type="submit">Apply</button>
+  <a class="btn" href="/admin/orders">Reset</a>
+
+  <!-- Export CSV (preserves current filters) -->
+  <a class="btn"
+     href="/admin/orders/export.csv?q=<%= encodeURIComponent(q||'') %>&status=<%= encodeURIComponent(status||'') %>&from=<%= encodeURIComponent(from||'') %>&to=<%= encodeURIComponent(to||'') %>">
+    Export CSV
+  </a>
 </form>
 
-<table>
-  <thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Created</th></tr></thead>
-  <tbody>
-  <% orders.forEach(o => { %>
-    <tr>
-      <td><a href="/admin/orders/<%= o._id %>"><%= o.orderNo %></a></td>
-      <td><%= o.customerEmail || '-' %></td>
-      <td><%= o.items.reduce((n,i)=>n+i.qty,0) %></td>
-      <td>₺ <%= o.grandTotal.toFixed(2) %></td>
-      <td><%= o.status %></td>
-      <td><%= o.createdAt.toLocaleString() %></td>
-    </tr>
-  <% }) %>
-  </tbody>
-</table>
+<!-- Result count -->
+<div class="muted" style="margin-bottom:12px;">
+  <%= total || 0 %> result<%= (total||0)===1?'':'s' %>
+</div>
 
-<% if (pages && pages > 1) { %>
-  <p>
-    <% for (let p=1; p<=pages; p++) { %>
-      <% if (p === page) { %><strong><%= p %></strong> <% } else { %>
-        <a href="/admin/orders?<%= `q=${encodeURIComponent(q||'')}&status=${encodeURIComponent(status||'')}&page=${p}` %>"><%= p %></a>
+<% if (!orders || !orders.length) { %>
+  <p>No orders found.</p>
+<% } else { %>
+  <div style="overflow:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Placed</th>
+          <th>Customer</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% orders.forEach(o => {
+           const itemCount = (o.items||[]).reduce((n,i)=>n+(i.qty||1),0);
+           const totalVal =
+             (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
+             o.grandTotal ?? o.subtotal ?? 0;
+      %>
+        <tr>
+          <td><a href="/admin/orders/<%= o._id %>"><%= o.orderNo || o._id %></a></td>
+          <td><%= new Date(o.createdAt).toLocaleString() %></td>
+          <td><%= o.customerEmail || '-' %></td>
+          <td><%= itemCount %></td>
+          <td>₺ <%= Number(totalVal).toFixed(2) %></td>
+          <td><span class="pill"><%= o.status %></span></td>
+          <td><a class="btn" href="/admin/orders/<%= o._id %>">View</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if ((pages || 1) > 1) { %>
+    <div class="pagination" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+      <% for (let p=1; p<=pages; p++) { %>
+        <a class="btn <%= p===page?'active':'' %>"
+           href="?q=<%= encodeURIComponent(q||'') %>&status=<%= encodeURIComponent(status||'') %>&from=<%= encodeURIComponent(from||'') %>&to=<%= encodeURIComponent(to||'') %>&page=<%= p %>">
+          <%= p %>
+        </a>
       <% } %>
-    <% } %>
-  </p>
+    </div>
+  <% } %>
 <% } %>
-<%- include('../shared/footer') %>
 
+<%- include('../shared/footer') %>

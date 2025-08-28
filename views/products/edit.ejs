@@ -1,35 +1,6 @@
-<%- include('../shared/header') %>
-<h1>Edit Product</h1>
+<%- include('../shared/header', { title: 'Edit Product' }) %>
 
-<form method="POST" action="/admin/products/<%= product._id %>/edit" class="form">
-  <label>Title* <input name="title" value="<%= product.title %>" required></label>
-  <label>SKU* <input name="sku" value="<%= product.sku %>" required></label>
-  <label>Price* <input type="number" step="0.01" min="0" name="price" value="<%= product.price %>" required></label>
-  <label>Stock* <input type="number" min="0" name="stockQty" value="<%= product.stockQty %>" required></label>
-  <label>Status
-    <select name="status">
-      <option <%= product.status==='Draft'?'selected':'' %>>Draft</option>
-      <option <%= product.status==='Active'?'selected':'' %>>Active</option>
-    </select>
-  </label>
-  <label>Category
-    <select name="categories" multiple>
-      <% cats.forEach(c => { %>
-        <option value="<%= c._id %>" <%= product.categories.some(id => id.toString() === c._id.toString()) ? 'selected' : '' %>><%= c.name %></option>
-      <% }) %>
-    </select>
-  </label>
-  <label>Image URL <input name="image" value="<%= product.images && product.images[0] ? product.images[0] : '' %>"></label>
-  <button type="submit">Save changes</button>
-</form>
-
-<form method="POST" action="/admin/products/<%= product._id %>/delete" onsubmit="return confirm('Delete this product?')">
-  <button type="submit">Delete</button>
-</form>
-
-<%- include('../shared/footer') %>
-
-
+<h1>Edit product</h1>
 
 <% if (errors && errors.length) { %>
   <div class="alert-error">
@@ -37,12 +8,118 @@
   </div>
 <% } %>
 
-<!-- examples for inputs -->
-<input name="title" value="<%= (values && values.title) || product.title %>" required>
-<input name="sku" value="<%= (values && values.sku) || product.sku %>" required>
-<input type="number" step="0.01" min="0" name="price" value="<%= (values && values.price) || product.price %>" required>
-<input type="number" min="0" name="stockQty" value="<%= (values && values.stockQty) || product.stockQty %>" required>
-<select name="status">
-  <option <%= ((values && values.status) || product.status)==='Draft' ? 'selected' : '' %>>Draft</option>
-  <option <%= ((values && values.status) || product.status)==='Active' ? 'selected' : '' %>>Active</option>
-</select>
+<!-- MAIN EDIT FORM (no uploads here) -->
+<form method="POST" action="/admin/products/<%= product._id %>/edit" class="form" id="main-edit">
+  <label>Title* <input name="title" value="<%= product.title %>" required></label>
+  <label>SKU* <input name="sku" value="<%= product.sku %>" required></label>
+  <label>Price* <input type="number" step="0.01" min="0" name="price" value="<%= product.price %>" required></label>
+  <label>Stock* <input type="number" min="0" name="stockQty" value="<%= product.stockQty %>" required></label>
+
+  <label>Status
+    <select name="status">
+      <option value="Draft"  <%= product.status==='Draft' ? 'selected' : '' %>>Draft</option>
+      <option value="Active" <%= product.status==='Active' ? 'selected' : '' %>>Active</option>
+    </select>
+  </label>
+
+  <label>Category
+    <select name="categories" multiple>
+      <% const selectedCats = (product.categories || []).map(String); %>
+      <% cats.forEach(c => { %>
+        <option value="<%= c._id %>" <%= selectedCats.includes(String(c._id)) ? 'selected' : '' %>><%= c.name %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <div class="hstack" style="gap:10px; margin-top:10px;">
+    <button type="submit" class="btn btn--brand">Save changes</button>
+  </div>
+</form>
+
+<!-- Delete (separate form to avoid nesting) -->
+<form method="POST" action="/admin/products/<%= product._id %>/delete" style="margin-top:8px;">
+  <button class="btn" onclick="return confirm('Delete this product?')">Delete</button>
+</form>
+
+<hr>
+
+<!-- IMAGE GALLERY (separate forms, so main edit form isn’t nested) -->
+<section>
+  <h2>Product images</h2>
+  <p class="muted">Drag to reorder; click to set cover or remove.</p>
+
+  <% const imgs = Array.isArray(product.images) ? product.images : []; %>
+
+  <div id="gallery" style="display:flex; gap:12px; flex-wrap:wrap;">
+    <% imgs.forEach((img, idx) => { 
+         const src = img.startsWith('http') || img.startsWith('/') ? img : ('/' + img);
+    %>
+      <div class="card pad draggable" draggable="true" data-url="<%= img %>" style="width:130px;">
+        <img src="<%= src %>" alt="" style="width:100%; height:120px; object-fit:cover; border-radius:6px; background:#f6f6f6;">
+        <div class="hstack" style="gap:6px; margin-top:6px;">
+          <form method="POST" action="/admin/products/<%= product._id %>/images/<%= idx %>/cover">
+            <button class="btn btn--sm">Make cover</button>
+          </form>
+          <form method="POST" action="/admin/products/<%= product._id %>/images/<%= idx %>/remove">
+            <button class="btn btn--sm" onclick="return confirm('Remove this image?')">Remove</button>
+          </form>
+        </div>
+        <% if (idx === 0) { %><div class="badge" style="margin-top:6px;">Cover</div><% } %>
+      </div>
+    <% }) %>
+  </div>
+
+  <!-- Save order -->
+  <form id="order-form" method="POST" action="/admin/products/<%= product._id %>/images/order" style="margin-top:10px;">
+    <input type="hidden" name="order" id="order-input">
+    <button class="btn">Save order</button>
+  </form>
+
+  <hr>
+
+  <!-- Add by URL -->
+  <form method="POST" action="/admin/products/<%= product._id %>/images/url" class="form">
+    <label>Image URL <input name="imageUrl" placeholder="https://..."></label>
+    <button class="btn">Add</button>
+  </form>
+
+  <!-- Upload (file) -->
+  <form method="POST" action="/admin/products/<%= product._id %>/images" enctype="multipart/form-data" class="form" style="margin-top:8px;">
+    <label>Upload image
+      <input type="file" name="imageFile" accept=".jpg,.jpeg,.png,.webp">
+    </label>
+    <div class="muted">JPEG/PNG/WebP, up to <strong>8&nbsp;MB</strong>.</div>
+    <button class="btn">Upload</button>
+  </form>
+</section>
+
+<script>
+// very small D&D reordering; stores order of data-url into hidden input
+(function () {
+  const gal = document.getElementById('gallery');
+  if (!gal) return;
+  let dragEl = null;
+
+  gal.addEventListener('dragstart', e => {
+    const t = e.target.closest('.draggable');
+    if (t) { dragEl = t; e.dataTransfer.effectAllowed = 'move'; }
+  });
+  gal.addEventListener('dragover', e => {
+    e.preventDefault();
+    const t = e.target.closest('.draggable');
+    if (!t || t === dragEl) return;
+    const rect = t.getBoundingClientRect();
+    const after = (e.clientX - rect.left) > rect.width / 2;
+    gal.insertBefore(dragEl, after ? t.nextSibling : t);
+  });
+  gal.addEventListener('dragend', () => dragEl = null);
+
+  const form = document.getElementById('order-form');
+  form.addEventListener('submit', () => {
+    const urls = Array.from(gal.querySelectorAll('.draggable')).map(d => d.dataset.url);
+    document.getElementById('order-input').value = urls;
+  });
+})();
+</script>
+
+<%- include('../shared/footer') %>

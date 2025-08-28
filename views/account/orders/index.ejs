@@ -1,0 +1,41 @@
+<%- include('../../shared/header') %>
+<h1>My Orders</h1>
+
+<% const list = Array.isArray(orders) ? orders : []; %>
+<% if (!list.length) { %>
+  <p class="muted">You haven’t placed any orders yet.</p>
+<% } else { %>
+  <div style="overflow:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Placed</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% list.forEach(o => {
+           const itemCount = (o.items||[]).reduce((n,i)=>n+(i.qty||1),0);
+           const totalVal =
+             (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
+             o.grandTotal ?? o.subtotal ?? 0;
+      %>
+        <tr>
+          <td><%= o.orderNo || o._id %></td>
+          <td><%= new Date(o.createdAt).toLocaleString() %></td>
+          <td><%= itemCount %></td>
+          <td>₺ <%= Number(totalVal).toFixed(2) %></td>
+          <td><span class="pill"><%= o.status %></span></td>
+          <td><a class="btn" href="/account/orders/<%= o._id %>">View</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('../../shared/footer') %>

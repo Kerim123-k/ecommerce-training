@@ -17,6 +17,9 @@ const productSchema = new Schema(
     brand: String,
     taxable: { type: Boolean, default: true },
     trackInventory: { type: Boolean, default: true },
+    ratingAvg:   { type: Number, default: 0 },
+ratingCount: { type: Number, default: 0 },
+
     isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }

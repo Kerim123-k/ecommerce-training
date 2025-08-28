@@ -5,17 +5,22 @@ const express = require('express');
 const session = require('express-session');
 const morgan  = require('morgan');
 
+const couponRoutes = require('./routes/coupon.routes');
+
 const app = express();
 
 /* ---------- Views & core middleware ---------- */
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(morgan(process.env.NODE_ENV === 'test' ? 'tiny' : 'dev'));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
-/* ---------- Sessions (must come BEFORE locals) ---------- */
+
+/* ---------- Sessions (must come BEFORE locals & routes) ---------- */
 let store;
 if (process.env.NODE_ENV === 'test') {
   store = new session.MemoryStore();
@@ -29,10 +34,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 },
+  cookie: { maxAge: 1000 * 60 * 60 }, // 1h
   store,
 }));
 
+/* ---------- Gate admin URLs ---------- */
 const requireAdmin = require('./middleware/requireAdmin');
 app.use((req, res, next) => {
   if (req.path.startsWith('/admin/')) return requireAdmin(req, res, next);
@@ -41,9 +47,19 @@ app.use((req, res, next) => {
 
 /* ---------- Safe locals (after session) ---------- */
 app.use((req, res, next) => {
-  res.locals.cartCount   = req.session?.cart?.itemCount || 0;
   res.locals.currentUser = req.session?.user || null;
-  res.locals.banner      = null;
+
+  // Wishlist badges/toggles
+  const wl = req.session?.wishlist?.items || [];
+  res.locals.wishlistCount = wl.length;
+  res.locals.wishlistIds   = wl.map(String);
+
+  // Cart badge
+  const items = req.session?.cart?.items || [];
+  res.locals.cartCount = items.reduce((n, it) => n + Number(it.qty || 0), 0);
+
+  // Optional banner slot
+  res.locals.banner = null;
   next();
 });
 
@@ -51,11 +67,13 @@ app.use((req, res, next) => {
 const authRoutes            = require('./routes/auth.routes');             // /auth/*
 const productRoutes         = require('./routes/product.routes');          // /admin/products, /products
 const categoryRoutes        = require('./routes/category.routes');         // /admin/categories
-const cartRoutes            = require('./routes/cart.routes');             // /cart, /checkout
+const cartRoutes            = require('./routes/cart.routes');             // /cart, /checkout (mock)
 const accountAddressRoutes  = require('./routes/account.address.routes');  // /account/addresses
-const orderRoutes           = require('./routes/order.routes');            // /admin/orders, thank-you, etc.
-const accountRoutes = require('./routes/account.routes');
-
+const orderRoutes           = require('./routes/order.routes');            // /admin/orders, account orders
+const accountRoutes         = require('./routes/account.routes');
+const reviewRoutes          = require('./routes/review.routes');
+const wishlistRoutes        = require('./routes/wishlist.routes');
+const paymentRoutes         = require('./routes/payment.routes');          // /checkout/card (demo), etc.
 
 app.use(authRoutes);
 app.use(productRoutes);
@@ -64,6 +82,10 @@ app.use(cartRoutes);
 app.use(accountAddressRoutes);
 app.use(orderRoutes);
 app.use(accountRoutes);
+app.use(reviewRoutes);
+app.use(wishlistRoutes);
+app.use(paymentRoutes); // ✅ mount AFTER session & parsers
+app.use(couponRoutes);
 
 /* ---------- Root & health ---------- */
 app.get('/', (_req, res) => res.redirect('/products'));

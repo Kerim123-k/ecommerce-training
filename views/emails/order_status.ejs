@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <body style="font-family:system-ui,Segoe UI,Arial,sans-serif;">
+    <h2>Status update for <%= order.orderNo || order._id %></h2>
+    <p>Your order is now: <strong><%= statusLabel %></strong>.</p>
+
+    <% if (order.tracking && (order.tracking.carrier || order.tracking.number)) { %>
+      <p>Tracking: <%= order.tracking.carrier || '-' %> <%= order.tracking.number || '' %></p>
+    <% } %>
+
+    <p><a href="<%= (process.env.APP_URL || 'http://localhost:3000') %>/account/orders/<%= order._id %>">View order</a></p>
+  </body>
+</html>
