@@ -6,6 +6,8 @@ const session = require('express-session');
 const morgan  = require('morgan');
 
 const couponRoutes = require('./routes/coupon.routes');
+const authController   = require('./controllers/auth.controller');
+const orderController  = require('./controllers/order.controller');
 
 const app = express();
 
@@ -62,6 +64,11 @@ app.use((req, res, next) => {
   res.locals.banner = null;
   next();
 });
+app.get('/account', (req, res) => {
+  if (!req.session?.user) return res.redirect('/auth/login');
+  res.render('account/index');
+});
+
 
 /* ---------- Routes ---------- */
 const authRoutes            = require('./routes/auth.routes');             // /auth/*
@@ -86,6 +93,9 @@ app.use(reviewRoutes);
 app.use(wishlistRoutes);
 app.use(paymentRoutes); // ✅ mount AFTER session & parsers
 app.use(couponRoutes);
+// src/server.js (or wherever you do app.use)
+app.use(require('./routes/productImages.routes'));
+
 
 /* ---------- Root & health ---------- */
 app.get('/', (_req, res) => res.redirect('/products'));
@@ -93,5 +103,8 @@ app.get('/healthz', (_req, res) => res.status(200).send('OK'));
 
 /* ---------- 404 (keep last) ---------- */
 app.use((_req, res) => res.status(404).send('Not found'));
+
+app.get('/account/delete', authController.deleteAccountForm);
+app.post('/account/delete', authController.deleteAccount);
 
 module.exports = app;

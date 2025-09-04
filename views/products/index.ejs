@@ -1,33 +1,31 @@
-<%- include('../shared/header') %>
-<h1>Products</h1>
+<%- include('../shared/header', { title: 'Shop' }) %>
 
-<p><a href="/admin/products/new">+ Add Product</a></p>
+<h1>Shop</h1>
 
-<% if (!products.length) { %>
-  <p>No products yet. <a href="/admin/products/new">Create the first one</a>.</p>
-<%- include('../shared/footer') %>
+<% if (!Array.isArray(products) || products.length === 0) { %>
+  <p>No products found.</p>
 <% } else { %>
-
-<table>
-  <thead><tr><th>Title</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead>
-  <tbody>
-  <% products.forEach(p => { %>
-    <tr>
-      <td><%= p.title %></td>
-      <td><%= p.sku %></td>
-      <td><%= p.price.toFixed(2) %></td>
-      <td><%= p.stockQty %></td>
-      <td><%= p.status %></td>
-      <td>
-        <a href="/admin/products/<%= p._id %>/edit">Edit</a>
-        <form method="POST" action="/admin/products/<%= p._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this product?')">
-          <button type="submit">Delete</button>
-        </form>
-      </td>
-    </tr>
-  <% }) %>
-  </tbody>
-</table>
+  <div class="grid" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap:18px;">
+    <% products.forEach(p => { 
+         const img = (Array.isArray(p.images) && p.images[0]) || p.image || '/placeholder.png';
+         const price = Number(p.price || 0);
+    %>
+      <div class="card" style="border:1px solid #eee; border-radius:12px; overflow:hidden;">
+        <a href="/p/<%= p.slug || ('id/' + p._id) %>" style="display:block;">
+          <img src="<%= img %>" alt="<%= p.title %>" style="width:100%; height:180px; object-fit:cover;" />
+        </a>
+        <div style="padding:12px;">
+          <a href="/p/<%= p.slug || ('id/' + p._id) %>"><strong><%= p.title %></strong></a>
+          <div class="muted" style="margin:6px 0;">SKU <%= p.sku || '-' %></div>
+          <div style="font-weight:700;">₺ <%= price.toFixed(2) %></div>
+          <form method="POST" action="/cart/add/<%= p._id %>" style="margin-top:10px;">
+            <input type="hidden" name="qty" value="1" />
+            <button class="btn" type="submit">Add to cart</button>
+          </form>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>
 
 <%- include('../shared/footer') %>
-<% } %>

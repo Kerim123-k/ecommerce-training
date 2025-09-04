@@ -1,0 +1,41 @@
+<%- include('../../shared/header', { title: 'Admin • Product images' }) %>
+
+<h1>Upload images</h1>
+<form method="POST" action="/admin/products/<%= p._id %>/images/upload" enctype="multipart/form-data" class="vstack" style="gap:10px; max-width:720px">
+  <input type="file" name="images" multiple accept="image/*">
+  <button class="btn btn--brand" type="submit">Upload</button>
+</form>
+
+<h2 style="margin-top:28px">Gallery <small>(cover is the first image)</small></h2>
+
+<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px;">
+  <% (p.images || []).forEach((url, i) => { %>
+    <div class="card">
+      <div class="card__media" style="background:#111">
+        <img src="<%= url %>" alt="image <%= i+1 %>" style="display:block; width:100%; height:220px; object-fit:cover;">
+      </div>
+      <div class="card__body">
+        <p class="muted"><%= i === 0 ? 'Cover' : ('Image ' + (i+1)) %></p>
+
+        <% if (i > 0) { %>
+          <form method="POST" action="/admin/products/<%= p._id %>/images/set-primary" style="display:inline">
+            <input type="hidden" name="idx" value="<%= i %>">
+            <button class="btn" type="submit">Make cover</button>
+          </form>
+        <% } %>
+
+        <form method="POST" action="/admin/products/<%= p._id %>/images/<%= i %>/delete" style="display:inline">
+          <button class="btn btn--danger" type="submit">Delete</button>
+        </form>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<h3 style="margin-top:28px">Reorder (CSV)</h3>
+<form method="POST" action="/admin/products/<%= p._id %>/images/reorder" class="hstack" style="gap:10px; max-width:520px">
+  <input class="input" name="orderCsv" placeholder="e.g. 2,0,1 for 3 images" autocomplete="off">
+  <button class="btn" type="submit">Save order</button>
+</form>
+
+<%- include('../../shared/footer') %>

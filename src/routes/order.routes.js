@@ -3,7 +3,7 @@ const router = require('express').Router();
 const oc = require('../controllers/order.controller');
 const { receiptUpload } = require('../middleware/upload');   // <-- get the right uploader
 const requireAdmin = require('../middleware/requireAdmin');
-
+const orders = require('../controllers/order.controller');
 /* =========================
    Customer routes
    ========================= */
@@ -22,7 +22,10 @@ router.post(
    ========================= */
 router.get('/admin/orders', requireAdmin, oc.adminList);
 router.get('/admin/orders/:id', requireAdmin, oc.adminShow);
+router.get('/account/orders/:id/invoice.pdf', oc.invoiceMy);
 
+// Admin invoice
+router.get('/admin/orders/:id/invoice.pdf', requireAdmin, oc.invoiceAdmin);
 router.post('/admin/orders/:id/process', requireAdmin, oc.adminProcess);
 router.post('/admin/orders/:id/ship',     requireAdmin, oc.adminShip);
 router.post('/admin/orders/:id/deliver',  requireAdmin, oc.adminDeliver);
@@ -33,6 +36,14 @@ router.get('/admin/dashboard', requireAdmin, oc.adminDashboard);
 // Mark Paid (manual payments)
 router.post('/admin/orders/:id/mark-paid', requireAdmin, oc.adminMarkPaid);
 
+
+
+router.post('/admin/orders/:id/cancel-approve', orders.adminCancelApprove);
+router.post('/admin/orders/:id/cancel-deny',    orders.adminCancelDeny);
+
+// Approve / deny return
+router.post('/admin/orders/:id/return-approve', orders.adminReturnApprove);
+router.post('/admin/orders/:id/return-deny',    orders.adminReturnDeny);
 // Export CSV
 router.get('/admin/orders/export/csv', requireAdmin, oc.adminExportCsv);
 

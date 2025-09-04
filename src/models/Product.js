@@ -19,6 +19,8 @@ const productSchema = new Schema(
     trackInventory: { type: Boolean, default: true },
     ratingAvg:   { type: Number, default: 0 },
 ratingCount: { type: Number, default: 0 },
+  image:   { type: String, default: '' },         // legacy single image
+  images:  { type: [String], default: [] },
 
     isDeleted: { type: Boolean, default: false }
   },

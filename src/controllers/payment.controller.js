@@ -3,6 +3,14 @@ const Product  = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order    = require('../models/Order');
 
+// ---- Email helpers (safe no-op fallback if the service file is missing) ----
+let sendOrderConfirmation = async () => {};
+try {
+  ({ sendOrderConfirmation } = require('../services/orderEmails'));
+} catch (e) {
+  console.warn('[payment.controller] orderEmails service not found; emails disabled.');
+}
+
 const TAX_RATE = Number(process.env.TAX_RATE || 0);
 
 const SHIPPING_METHODS = [
@@ -79,6 +87,7 @@ exports.cardCharge = async (req, res, next) => {
       name = '', number = '', expMonth = '', expYear = '', cvv = '',
     } = req.body;
 
+    // shipping method is carried via query (?method=express|standard|free)
     const selectedShipping = req.query.method || 'standard';
 
     const subtotal = Number(
@@ -123,8 +132,9 @@ exports.cardCharge = async (req, res, next) => {
     // Resolve default address (if logged in)
     const userId = req.session?.user?._id || null;
     let shippingAddress = null;
+    let me = null;
     if (userId) {
-      const me = await Customer.findById(userId).lean();
+      me = await Customer.findById(userId).lean();
       const addr = (me?.addresses || []).find(a => a.isDefault) || (me?.addresses || [])[0];
       if (addr) {
         shippingAddress = {
@@ -147,10 +157,13 @@ exports.cardCharge = async (req, res, next) => {
       return { productId: p._id, sku: p.sku, title: p.title, qty: i.qty, unitPrice: p.price };
     });
 
+    // choose recipient: customer email if known, else ADMIN_EMAIL fallback
+    const customerEmail = (req.session?.user?.email || me?.email || process.env.ADMIN_EMAIL || '').trim();
+
     const order = await Order.create({
       orderNo: 'ORD-' + Math.floor(Date.now() / 1000),
       customerId: userId,
-      customerEmail: req.session?.user?.email || '',
+      customerEmail,
       items,
       subtotal,
       discount,
@@ -161,7 +174,14 @@ exports.cardCharge = async (req, res, next) => {
       status: 'Paid',
       paymentMethod: 'Card (Demo)',
       paymentStatus: 'Paid',
-      timeline: [{ at: new Date(), status: 'Paid', note: 'Paid via Demo Card' }]
+      timeline: [{ at: new Date(), status: 'Paid', note: 'Paid via Demo Card' }],
+      // record coupon details if present
+      couponCode: coupon?.code || coupon?.name || null,
+    });
+
+    // fire-and-forget confirmation email (won’t block checkout)
+    sendOrderConfirmation(order).catch(err => {
+      console.warn('[email] sendOrderConfirmation failed:', err?.message || err);
     });
 
     // decrement stock

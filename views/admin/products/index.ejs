@@ -1,0 +1,39 @@
+<%- include('../../shared/header', { title: 'Admin • Products' }) %>
+
+<h1>Products</h1>
+<p><a class="btn" href="/admin/products/new">+ New product</a></p>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>SKU</th>
+      <th>Price</th>
+      <th>Status</th>
+      <th>Stock</th>
+      <th>Images</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% (products || []).forEach(p => { %>
+      <tr>
+        <td><strong><%= p.title %></strong></td>
+        <td class="muted"><%= p.sku || '-' %></td>
+        <td>₺ <%= Number(p.price||0).toFixed(2) %></td>
+        <td><span class="pill"><%= p.status || 'Draft' %></span></td>
+        <td><%= p.trackInventory === false ? '∞' : (p.stockQty || 0) %></td>
+        <td><%= Array.isArray(p.images) ? p.images.length : 0 %></td>
+        <td style="white-space:nowrap;">
+          <a class="btn" href="/admin/products/<%= p._id %>/images">Images</a>
+          <a class="btn" href="/admin/products/<%= p._id %>/edit">Edit</a>
+          <form method="POST" action="/admin/products/<%= p._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this product?');">
+            <button class="btn btn--danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+
+<%- include('../../shared/footer') %>

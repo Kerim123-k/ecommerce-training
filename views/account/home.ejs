@@ -1,0 +1,26 @@
+<%- include('../shared/header', { title: 'My Account' }) %>
+
+<h1>My Account</h1>
+
+<div class="grid" style="display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:16px;">
+  <a class="card" href="/account/orders" style="padding:16px; display:block;">
+    <h3 style="margin:0 0 6px;">Orders</h3>
+    <div class="muted"><%= typeof ordersCount !== 'undefined' ? ordersCount : '' %></div>
+  </a>
+
+  <a class="card" href="/account/addresses" style="padding:16px; display:block;">
+    <h3 style="margin:0 0 6px;">Addresses</h3>
+    <div class="muted"><%= typeof addressesCount !== 'undefined' ? addressesCount : '' %></div>
+  </a>
+
+  <a class="card" href="/wishlist" style="padding:16px; display:block;">
+    <h3 style="margin:0 0 6px;">Wishlist</h3>
+  </a>
+
+  <a class="card" href="/account/delete" style="padding:16px; display:block;">
+    <h3 style="margin:0 0 6px; color:#b00020;">Delete account</h3>
+    <div class="muted">Permanently delete and anonymize orders</div>
+  </a>
+</div>
+
+<%- include('../shared/footer') %>

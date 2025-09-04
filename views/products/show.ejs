@@ -1,0 +1,32 @@
+<!-- views/products/show.ejs -->
+<%- include('../shared/header', { title: (p && p.title) || 'Product' }) %>
+
+<%
+// Normalize images for gallery
+const images = Array.isArray(p?.images) && p.images.length ? p.images : (p?.image ? [p.image] : []);
+%>
+
+<section class="container" style="margin-top:20px;">
+  <!-- Gallery -->
+  <%- include('../shared/product_gallery', { item: p, images }) %>
+
+  <!-- Info (kept simple; matches your current layout) -->
+  <div style="margin-top:18px;">
+    <h1><%= p.title %></h1>
+    <p class="muted">SKU <%= p.sku %></p>
+    <p style="font-size:20px;font-weight:600;">₺ <%= Number(p.price || 0).toFixed(2) %></p>
+
+    <form method="POST" action="/cart/add/<%= p._id %>" class="hstack" style="gap:10px;">
+      <input type="number" name="qty" value="1" min="1" class="input" style="width:80px;">
+      <button class="btn btn--brand" type="submit">Add to cart</button>
+      <a class="btn" href="/products">Back to shop</a>
+    </form>
+  </div>
+</section>
+
+<section class="container" style="margin-top:28px;">
+  <h2>Reviews</h2>
+  <p class="muted">No one has reviewed this product yet.</p>
+</section>
+
+<%- include('../shared/footer') %>

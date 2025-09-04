@@ -1,7 +1,8 @@
 // src/controllers/product.controller.js
+'use strict';
+
 const path = require('path');
 const mongoose = require('mongoose');
-const { validationResult } = require('express-validator');
 const slugify = require('slugify');
 
 const Product  = require('../models/Product');
@@ -9,261 +10,149 @@ const Category = require('../models/Category');
 const Order    = require('../models/Order');
 const Review   = require('../models/Review');
 
+/* ------------------------------------------------------------------ */
+/* Helpers                                                            */
+/* ------------------------------------------------------------------ */
 const toArray = v => (Array.isArray(v) ? v : (v ? [v] : []));
 
-/* ----------------------------- ADMIN: LIST ----------------------------- */
-exports.list = async (_req, res) => {
-  const products = await Product.find({ isDeleted: { $ne: true } })
-    .populate('categories')
-    .sort({ createdAt: -1 });
+function relFromPublic(absPath) {
+  // ".../public/uploads/products/2025/08/file.jpg" -> "/uploads/products/2025/08/file.jpg"
+  if (!absPath) return '';
+  const marker = `${path.sep}public${path.sep}`;
+  const ix = absPath.indexOf(marker);
+  if (ix === -1) return '';
+  return absPath.substring(ix + marker.length - 1).replace(/\\/g, '/');
+}
 
-  res.render('products/index', { products });
-};
-
-/* ------------------------ ADMIN: CREATE (FORM) ------------------------- */
-exports.createForm = async (_req, res) => {
-  const cats = await Category.find({ status: 'Active' }).sort({ name: 1 });
-  res.render('products/new', { cats, errors: [], values: {} });
-};
-
-/* ---------------------- helpers: image collection ---------------------- */
-function relFromReqFile(req) {
-  if (!req.file) return null;
-  if (req.file.relUrl) return req.file.relUrl; // set by route middleware
-  if (req.file.path) {
-    const parts = req.file.path.split(path.sep + 'public' + path.sep);
-    if (parts[1]) return '/' + parts[1].replace(/\\/g, '/');
+function ensureImagesArray(p) {
+  if (!Array.isArray(p.images)) p.images = [];
+  // keep primary (p.image) as first if present
+  if (p.image) {
+    p.images = [p.image, ...p.images.filter(u => u !== p.image)];
   }
-  return null;
+  return p.images;
 }
 
-function collectImages(req) {
-  const out = [];
-  const url = (req.body.image || '').trim(); // optional URL field
-  if (url) out.push(url);
+/* ================================================================== */
+/*                              ADMIN                                  */
+/* ================================================================== */
 
-  const rel = relFromReqFile(req);
-  if (rel) out.push(rel);
-
-  return [...new Set(out.filter(Boolean))];
-}
-
-/* ------------------------ ADMIN: CREATE (POST) ------------------------- */
-exports.create = async (req, res, next) => {
+// GET /admin/products
+exports.adminIndex = async (_req, res, next) => {
   try {
-    const result = validationResult(req);
-    if (!result.isEmpty()) {
-      return renderNewWithErrors(req, res, result.array().map(e => e.msg));
+    const products = await Product.find({ isDeleted: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.render('admin/products/index', { products });
+  } catch (e) { next(e); }
+};
+
+// GET /admin/products/new
+exports.adminNewForm = (_req, res) => {
+  res.render('admin/products/new', { values: {}, error: null });
+};
+
+// POST /admin/products
+exports.adminCreate = async (req, res, next) => {
+  try {
+    const v = req.body || {};
+
+    // optional single primary image upload
+    let primary = '';
+    if (req.file && req.file.path) {
+      const rel = relFromPublic(req.file.path);
+      if (rel) primary = rel;
     }
+    // optional URL field named "image"
+    const urlImage = (v.image || '').trim();
 
-    const exists = await Product.exists({ sku: req.body.sku, isDeleted: { $ne: true } });
-    if (exists) return renderNewWithErrors(req, res, ['A product with this SKU already exists.']);
+    const images = [];
+    if (primary) images.push(primary);
+    if (urlImage) images.push(urlImage);
 
-    const {
-      title, sku, price, stockQty,
-      status = 'Draft', categories = [],
-    } = req.body;
-
-    const images = collectImages(req);
-
-    if (status === 'Active') {
-      const errs = await checkActivationRules({ categories, images });
-      if (errs.length) return renderNewWithErrors(req, res, errs);
-    }
-
-    await Product.create({
-      title,
-      sku,
-      price: Number(price),
-      stockQty: Number(stockQty),
-      status,
-      categories: toArray(categories),
-      images,
+    const doc = await Product.create({
+      title: v.title || '',
+      sku: (v.sku || '').trim(),
+      price: Number(v.price || 0),
+      status: v.status || 'Draft',
+      trackInventory: !!v.trackInventory,
+      stockQty: Number(v.stockQty || 0),
+      description: v.description || '',
       image: images[0] || '',
-      slug: slugify(title, { lower: true, strict: true })
+      images,
+      // IMPORTANT: keep slug in sync so /p/:slug works
+      slug: slugify(v.title || '', { lower: true, strict: true })
     });
 
     res.redirect('/admin/products');
   } catch (e) {
-    if (e.code === 11000 && e.keyPattern && e.keyPattern.sku) {
-      return renderNewWithErrors(req, res, ['A product with this SKU already exists.']);
-    }
-    next(e);
+    res.status(400).render('admin/products/new', { values: req.body, error: e.message });
   }
 };
 
-/* -------------------------- ADMIN: EDIT (FORM) ------------------------- */
-exports.editForm = async (req, res, next) => {
+// GET /admin/products/:id/edit
+exports.adminEditForm = async (req, res, next) => {
   try {
-    const [product, cats] = await Promise.all([
-      Product.findById(req.params.id),
-      Category.find({ status: 'Active' }).sort({ name: 1 })
-    ]);
-    if (!product) return res.status(404).send('Product not found');
-
-    res.render('products/edit', { product, cats, errors: [], values: {} });
+    const p = await Product.findById(req.params.id).lean();
+    if (!p) return res.status(404).send('Not found');
+    res.render('admin/products/edit', { p, error: null });
   } catch (e) { next(e); }
 };
 
-/* -------------------------- ADMIN: UPDATE (POST) ----------------------- */
-exports.update = async (req, res, next) => {
+// POST /admin/products/:id
+exports.adminUpdate = async (req, res, next) => {
   try {
-    const result = validationResult(req);
-    if (!result.isEmpty()) {
-      return renderEditWithErrors(req, res, req.params.id, result.array().map(e => e.msg));
+    const p = await Product.findById(req.params.id);
+    if (!p) return res.status(404).send('Not found');
+
+    const v = req.body || {};
+    p.title = v.title || p.title;
+    p.sku = (v.sku || p.sku || '').trim();
+    p.price = Number(v.price || p.price || 0);
+    p.status = v.status || p.status || 'Draft';
+    p.trackInventory = !!v.trackInventory;
+    p.stockQty = Number(v.stockQty || p.stockQty || 0);
+    p.description = v.description || p.description || '';
+
+    // keep slug in sync with title
+    p.slug = slugify(p.title || '', { lower: true, strict: true });
+
+    // optional new primary image via upload
+    if (req.file && req.file.path) {
+      const rel = relFromPublic(req.file.path);
+      if (rel) {
+        p.image = rel;
+        p.images = ensureImagesArray(p);
+        if (!p.images.includes(rel)) p.images.unshift(rel);
+        // re-ensure primary at [0]
+        p.images = [rel, ...p.images.filter(u => u !== rel)];
+      }
     }
 
-    // prevent SKU duplicates (excluding this product)
-    const dup = await Product.exists({
-      sku: req.body.sku,
-      _id: { $ne: req.params.id },
-      isDeleted: { $ne: true }
-    });
-    if (dup) {
-      return renderEditWithErrors(req, res, req.params.id, ['A product with this SKU already exists.']);
-    }
+    await p.save();
+    res.redirect('/admin/products');
+  } catch (e) {
+    const p = await Product.findById(req.params.id).lean();
+    res.status(400).render('admin/products/edit', { p, error: e.message });
+  }
+};
 
-    const { title, sku, price, stockQty, status = 'Draft', categories = [] } = req.body;
-
-    // Only validate activation rules; do not modify images here
-    if (status === 'Active') {
-      const errs = await checkActivationRules({ categories, images: true });
-      if (errs.length) return renderEditWithErrors(req, res, req.params.id, errs);
-    }
-
-    await Product.findByIdAndUpdate(
-      req.params.id,
-      {
-        title,
-        sku,
-        price: Number(price),
-        stockQty: Number(stockQty),
-        status,
-        categories: toArray(categories),
-        slug: slugify(title, { lower: true, strict: true })
-      },
-      { runValidators: true }
+// POST /admin/products/:id/delete  (soft delete)
+exports.adminDelete = async (req, res, next) => {
+  try {
+    await Product.updateOne(
+      { _id: req.params.id },
+      { $set: { isDeleted: true, status: 'Draft' } }
     );
-
-    res.redirect('/admin/products');
-  } catch (e) {
-    if (e.code === 11000 && e.keyPattern && e.keyPattern.sku) {
-      return renderEditWithErrors(req, res, req.params.id, ['A product with this SKU already exists.']);
-    }
-    next(e);
-  }
-};
-
-/* ----------------------------- GALLERY ACTIONS ------------------------- */
-// Upload (file)
-exports.addImage = async (req, res, next) => {
-  try {
-    const prod = await Product.findById(req.params.id);
-    if (!prod) return res.status(404).send('Product not found');
-
-    const rel = relFromReqFile(req);
-    if (!rel) return res.status(400).send('No file uploaded');
-
-    prod.images = Array.isArray(prod.images) ? prod.images : [];
-    prod.images.push(rel);
-    if (!prod.image) prod.image = rel; // set cover if none yet
-    await prod.save();
-
-    res.redirect(`/admin/products/${prod._id}/edit`);
-  } catch (e) { next(e); }
-};
-
-// Add by URL
-exports.addImageByUrl = async (req, res, next) => {
-  try {
-    const url = String(req.body.imageUrl || '').trim();
-    if (!url) return res.status(400).send('URL required');
-    const prod = await Product.findById(req.params.id);
-    if (!prod) return res.status(404).send('Product not found');
-
-    prod.images = Array.isArray(prod.images) ? prod.images : [];
-    prod.images.push(url);
-    if (!prod.image) prod.image = url;
-    await prod.save();
-
-    res.redirect(`/admin/products/${prod._id}/edit`);
-  } catch (e) { next(e); }
-};
-
-// Remove one image by index
-exports.removeImage = async (req, res, next) => {
-  try {
-    const idx = Number(req.params.index || -1);
-    const prod = await Product.findById(req.params.id);
-    if (!prod) return res.status(404).send('Product not found');
-    if (!Array.isArray(prod.images) || idx < 0 || idx >= prod.images.length) {
-      return res.redirect(`/admin/products/${prod._id}/edit`);
-    }
-    const [removed] = prod.images.splice(idx, 1);
-    if (prod.image === removed) prod.image = prod.images[0] || '';
-    await prod.save();
-    res.redirect(`/admin/products/${prod._id}/edit`);
-  } catch (e) { next(e); }
-};
-
-// Make cover = move that image to index 0
-exports.makeCover = async (req, res, next) => {
-  try {
-    const idx = Number(req.params.index || -1);
-    const prod = await Product.findById(req.params.id);
-    if (!prod) return res.status(404).send('Product not found');
-    if (!Array.isArray(prod.images) || idx < 0 || idx >= prod.images.length) {
-      return res.redirect(`/admin/products/${prod._id}/edit`);
-    }
-    const [img] = prod.images.splice(idx, 1);
-    prod.images.unshift(img);
-    prod.image = img;
-    await prod.save();
-    res.redirect(`/admin/products/${prod._id}/edit`);
-  } catch (e) { next(e); }
-};
-
-// Save new order (from client-side drag)
-exports.saveImageOrder = async (req, res, next) => {
-  try {
-    const order = req.body.order; // array of URLs in new order (or comma-separated)
-    const prod  = await Product.findById(req.params.id);
-    if (!prod) return res.status(404).send('Product not found');
-
-    const desired = (Array.isArray(order) ? order : String(order || '').split(','))
-      .map(s => String(s || '').trim())
-      .filter(Boolean);
-
-    // Keep only those that exist, then append any missing to avoid loss
-    const current = (prod.images || []).map(String);
-    const nextImages = desired.filter(src => current.includes(src));
-    current.forEach(src => { if (!nextImages.includes(src)) nextImages.push(src); });
-
-    prod.images = nextImages;
-    prod.image = nextImages[0] || '';
-    await prod.save();
-
-    res.redirect(`/admin/products/${prod._id}/edit`);
-  } catch (e) { next(e); }
-};
-
-/* ----------------------------- ADMIN: DELETE --------------------------- */
-exports.destroy = async (req, res, next) => {
-  try {
-    const id = req.params.id;
-
-    const used = await Order.exists({ 'items.productId': id });
-    if (used) {
-      await Product.findByIdAndUpdate(id, { isDeleted: true, status: 'Draft' });
-      return res.redirect('/admin/products');
-    }
-
-    await Product.findByIdAndDelete(id);
     res.redirect('/admin/products');
   } catch (e) { next(e); }
 };
 
-/* --------------------------- STOREFRONT: LIST -------------------------- */
+/* ================================================================== */
+/*                           STOREFRONT                                */
+/* ================================================================== */
+
+// GET /products
 exports.storefront = async (req, res, next) => {
   try {
     const { q = '', cat = '', sort = 'new' } = req.query;
@@ -305,25 +194,39 @@ exports.storefront = async (req, res, next) => {
 
     res.render('storefront/index', {
       products, cats, q, cat, sort,
-      page: pageNum, pages, total, currentCategory,
+      page: pageNum, pages, total, currentCategory
     });
   } catch (err) { next(err); }
 };
 
-/* ----------------------- STOREFRONT: DETAILS (slug) -------------------- */
-exports.show = async (req, res, next) => {
+// GET /p/:slugOrId  (slug or id)
+exports.showEither = async (req, res, next) => {
   try {
-    const product = await Product.findOne({
-      slug: req.params.slug,
-      status: 'Active',
-      isDeleted: { $ne: true }
-    }).populate('categories').lean();
+    const key = String(req.params.slugOrId || '').trim();
+    let product = null;
 
-    if (!product) return res.status(404).send('Product not found');
+    // 1) try slug
+    if (key) {
+      product = await Product.findOne({
+        slug: key, status: 'Active', isDeleted: { $ne: true }
+      }).lean();
+    }
+    // 2) fallback to id if looks like ObjectId
+    if (!product && mongoose.isValidObjectId(key)) {
+      product = await Product.findOne({
+        _id: key, status: 'Active', isDeleted: { $ne: true }
+      }).lean();
+    }
 
-    const qty      = Number(product.stockQty || 0);
+    if (!product) return res.status(404).send('Not found');
+
+    const qty = Number(product.stockQty || 0);
     const inStock  = qty > 0;
     const lowStock = product.trackInventory !== false && inStock && qty <= 5;
+
+    product.images = Array.isArray(product.images)
+      ? product.images
+      : (product.image ? [product.image] : []);
 
     const flash = req.session.flash || null;
     delete req.session.flash;
@@ -332,21 +235,22 @@ exports.show = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* ----------------------- STOREFRONT: DETAILS (id) ---------------------- */
+// GET /products/id/:id
 exports.showById = async (req, res, next) => {
   try {
     const product = await Product.findOne({
       _id: req.params.id,
       status: 'Active',
       isDeleted: { $ne: true }
-    }).populate('categories').lean();
+    }).lean();
 
-    if (!product) return res.status(404).send('Product not found');
+    if (!product) return res.status(404).send('Not found');
 
-    const qty      = Number(product.stockQty || 0);
+    const qty = Number(product.stockQty || 0);
     const inStock  = qty > 0;
     const lowStock = product.trackInventory !== false && inStock && qty <= 5;
 
+    // rating summary (optional)
     const [stats] = await Review.aggregate([
       { $match: { productId: product._id, status: 'Approved' } },
       { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: '$rating' } } }
@@ -368,21 +272,7 @@ exports.showById = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* ------------------------- ADMIN: LOW STOCK REPORT --------------------- */
-exports.adminLowStock = async (req, res, next) => {
-  try {
-    const threshold = Math.max(0, parseInt(req.query.t, 10) || 5);
-    const products = await Product.find({
-      isDeleted: { $ne: true },
-      status: 'Active',
-      trackInventory: true,
-      stockQty: { $gte: 0, $lte: threshold }
-    }).sort({ stockQty: 1, title: 1 }).lean();
-
-    res.render('reports/low_stock', { products, threshold });
-  } catch (e) { next(e); }
-};
-
+// GET /c/:slug
 exports.categoryPage = async (req, res, next) => {
   try {
     const { q = '', sort = 'new' } = req.query;
@@ -426,7 +316,7 @@ exports.categoryPage = async (req, res, next) => {
       .limit(limit)
       .lean();
 
-    // breadcrumb demo
+    // simple breadcrumb chain
     const breadcrumbs = [];
     let ptr = currentCategory;
     while (ptr && (ptr.parentId || ptr.parent)) {
@@ -451,39 +341,3 @@ exports.categoryPage = async (req, res, next) => {
     });
   } catch (err) { next(err); }
 };
-
-/* -------------------------------- HELPERS ------------------------------ */
-async function renderNewWithErrors(req, res, messages) {
-  const cats = await Category.find({ status: 'Active' }).sort({ name: 1 });
-  return res.status(400).render('products/new', {
-    cats,
-    errors: messages.map(msg => ({ msg })),
-    values: req.body
-  });
-}
-async function renderEditWithErrors(req, res, productId, messages) {
-  const [product, cats] = await Promise.all([
-    Product.findById(productId),
-    Category.find({ status: 'Active' }).sort({ name: 1 })
-  ]);
-  return res.status(400).render('products/edit', {
-    product,
-    cats,
-    errors: messages.map(msg => ({ msg })),
-    values: req.body
-  });
-}
-async function checkActivationRules({ categories, images }) {
-  const errors = [];
-  const catIds = toArray(categories);
-  const imgs = toArray(images);
-
-  if (imgs.filter(Boolean).length < 1) errors.push('To set status Active, add at least one image.');
-  if (catIds.length < 1) {
-    errors.push('To set status Active, select at least one category.');
-  } else {
-    const activeCount = await Category.countDocuments({ _id: { $in: catIds }, status: 'Active' });
-    if (activeCount < 1) errors.push('Selected categories are not active. Choose at least one active category.');
-  }
-  return errors;
-}

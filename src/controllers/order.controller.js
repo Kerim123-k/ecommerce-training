@@ -4,6 +4,7 @@ const path     = require('path');
 const Product  = require('../models/Product');
 const Order    = require('../models/Order');
 const Customer = require('../models/Customer');
+const { renderInvoice } = require('../services/invoicePdf');
 
 // ---- Email helpers (safe fallback if missing) ----
 let sendOrderConfirmation = async () => {};
@@ -16,6 +17,17 @@ try {
 
 function makeOrderNo() {
   return `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+}
+
+// Find the last Delivered timestamp from the timeline (if any)
+function getDeliveredAt(order) {
+  const tl = Array.isArray(order.timeline) ? order.timeline : [];
+  for (let i = tl.length - 1; i >= 0; i--) {
+    if (tl[i] && tl[i].status === 'Delivered' && tl[i].at) {
+      return new Date(tl[i].at);
+    }
+  }
+  return null;
 }
 
 /* =========================
@@ -42,11 +54,38 @@ async function myOrderShow(req, res, next) {
     const o = await Order.findOne({ _id: req.params.id, customerId: uid }).lean();
     if (!o) return res.status(404).send('Order not found');
 
+    // For totals rendering compatibility
     const total =
       (o.totals && (o.totals.grandTotal ?? o.totals.subTotal)) ??
       o.grandTotal ?? o.subtotal ?? 0;
 
-    res.render('account/orders/show', { order: o, normalizedTotal: Number(total) });
+    // Compute request eligibility flags for the UI
+    const status = o.status || 'New';
+    const isTerminal = ['Cancelled'].includes(status);
+    const isShippedOrLater = ['Shipped', 'Delivered', 'Cancelled'].includes(status);
+
+    const cancelEligible = !isShippedOrLater && !o.cancelRequestedAt && !isTerminal;
+
+    const deliveredAt = getDeliveredAt(o);
+    const returnWindowDays = Number(process.env.RETURN_WINDOW_DAYS || 14);
+    const withinReturnWindow =
+      !!deliveredAt &&
+      (Date.now() - deliveredAt.getTime()) <= returnWindowDays * 24 * 60 * 60 * 1000;
+
+    const returnEligible =
+      (status === 'Delivered') &&
+      withinReturnWindow &&
+      !o.returnRequestedAt &&
+      (o.returnStatus !== 'Approved');
+
+    res.render('account/orders/show', {
+      order: o,
+      normalizedTotal: Number(total),
+      cancelEligible,
+      returnEligible,
+      returnWindowDays,
+      deliveredAt
+    });
   } catch (e) { next(e); }
 }
 
@@ -81,6 +120,84 @@ async function uploadReceipt(req, res, next) {
     await o.save();
 
     req.session.flash = 'Receipt uploaded. We will verify your payment shortly.';
+    res.redirect(`/account/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+/* =========================
+   Customer: request Cancel / Return
+   ========================= */
+
+// POST /account/orders/:id/cancel-request
+async function requestCancel(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const o = await Order.findOne({ _id: req.params.id, customerId: uid });
+    if (!o) return res.status(404).send('Order not found');
+
+    if (['Shipped', 'Delivered', 'Cancelled'].includes(o.status)) {
+      req.session.flash = 'This order can no longer be cancelled.';
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+    if (o.cancelRequestedAt) {
+      req.session.flash = 'Cancellation already requested.';
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+
+    const reason = String(req.body.reason || '').trim();
+    o.cancelRequestedAt = new Date();
+    if (reason) o.cancelReason = reason;
+
+    o.timeline = o.timeline || [];
+    o.timeline.push({ status: 'Cancel Requested', note: reason || '', at: new Date() });
+
+    await o.save();
+    sendOrderStatus(o, 'Cancel Requested').catch(() => {});
+    req.session.flash = 'Your cancellation request was submitted.';
+    res.redirect(`/account/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+// POST /account/orders/:id/return-request
+async function requestReturn(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const o = await Order.findOne({ _id: req.params.id, customerId: uid });
+    if (!o) return res.status(404).send('Order not found');
+
+    const deliveredAt = getDeliveredAt(o);
+    const returnWindowDays = Number(process.env.RETURN_WINDOW_DAYS || 14);
+
+    if (o.status !== 'Delivered' || !deliveredAt) {
+      req.session.flash = 'You can only request a return after delivery.';
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+    const withinWindow =
+      (Date.now() - deliveredAt.getTime()) <= returnWindowDays * 24 * 60 * 60 * 1000;
+    if (!withinWindow) {
+      req.session.flash = `Return window (${returnWindowDays} days) has passed.`;
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+    if (o.returnRequestedAt || o.returnStatus === 'Approved') {
+      req.session.flash = 'A return request already exists for this order.';
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+
+    const reason = String(req.body.reason || '').trim();
+    o.returnRequestedAt = new Date();
+    if (reason) o.returnReason = reason;
+    o.returnStatus = 'Requested';
+
+    o.timeline = o.timeline || [];
+    o.timeline.push({ status: 'Return Requested', note: reason || '', at: new Date() });
+
+    await o.save();
+    sendOrderStatus(o, 'Return Requested').catch(() => {});
+    req.session.flash = 'Your return request was submitted.';
     res.redirect(`/account/orders/${o._id}`);
   } catch (e) { next(e); }
 }
@@ -211,6 +328,7 @@ async function adminCancel(req, res, next) {
     if (['Shipped', 'Delivered', 'Cancelled'].includes(o.status)) {
       return res.redirect(`/admin/orders/${o._id}`);
     }
+    // restore stock
     await Promise.all(o.items.map(i =>
       Product.updateOne(
         { _id: i.productId, trackInventory: true },
@@ -243,6 +361,89 @@ async function adminMarkPaid(req, res, next) {
   } catch (e) { next(e); }
 }
 
+/* -------- Admin: Approve / Deny customer requests -------- */
+
+// POST /admin/orders/:id/cancel-approve
+async function adminCancelApprove(req, res, next) {
+  try {
+    const o = await Order.findById(req.params.id);
+    if (!o) return res.status(404).send('Order not found');
+
+    if (!o.cancelRequestedAt) {
+      return res.redirect(`/admin/orders/${o._id}`);
+    }
+    if (['Shipped', 'Delivered', 'Cancelled'].includes(o.status)) {
+      return res.redirect(`/admin/orders/${o._id}`);
+    }
+
+    // Reuse cancel flow: restore stock, set status Cancelled
+    await Promise.all(o.items.map(i =>
+      Product.updateOne(
+        { _id: i.productId, trackInventory: true },
+        { $inc: { stockQty: i.qty } }
+      )
+    ));
+    o.status = 'Cancelled';
+    o.paymentStatus = 'Refunded'; // mock
+    pushTimeline(o, 'Cancelled', 'Customer cancel request approved by admin');
+    await o.save();
+
+    sendOrderStatus(o, 'Cancelled').catch(() => {});
+    res.redirect(`/admin/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+// POST /admin/orders/:id/cancel-deny
+async function adminCancelDeny(req, res, next) {
+  try {
+    const o = await Order.findById(req.params.id);
+    if (!o) return res.status(404).send('Order not found');
+    if (!o.cancelRequestedAt) return res.redirect(`/admin/orders/${o._id}`);
+
+    pushTimeline(o, 'Cancel Denied', String(req.body.note || ''));
+    // keep original status
+    await o.save();
+
+    sendOrderStatus(o, 'Cancel Denied').catch(() => {});
+    res.redirect(`/admin/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+// POST /admin/orders/:id/return-approve
+async function adminReturnApprove(req, res, next) {
+  try {
+    const o = await Order.findById(req.params.id);
+    if (!o) return res.status(404).send('Order not found');
+    if (!o.returnRequestedAt) return res.redirect(`/admin/orders/${o._id}`);
+
+    const rma = 'RMA-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    o.returnStatus = 'Approved';
+    o.rmaCode = rma;
+    pushTimeline(o, 'Return Approved', `RMA: ${rma}`);
+    await o.save();
+
+    sendOrderStatus(o, 'Return Approved').catch(() => {});
+    res.redirect(`/admin/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+// POST /admin/orders/:id/return-deny
+async function adminReturnDeny(req, res, next) {
+  try {
+    const o = await Order.findById(req.params.id);
+    if (!o) return res.status(404).send('Order not found');
+    if (!o.returnRequestedAt) return res.redirect(`/admin/orders/${o._id}`);
+
+    o.returnStatus = 'Denied';
+    pushTimeline(o, 'Return Denied', String(req.body.note || ''));
+    await o.save();
+
+    sendOrderStatus(o, 'Return Denied').catch(() => {});
+    res.redirect(`/admin/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
+/* ---------------------- CSV Export (admin) ---------------------- */
 async function adminExportCsv(req, res, next) {
   try {
     const { q = '', status = '', from = '', to = '' } = req.query;
@@ -303,6 +504,7 @@ async function adminExportCsv(req, res, next) {
   } catch (e) { next(e); }
 }
 
+/* ---------------------- Admin Dashboard ---------------------- */
 async function adminDashboard(_req, res, next) {
   try {
     const todayStart = new Date();
@@ -359,10 +561,65 @@ async function adminDashboard(_req, res, next) {
   } catch (e) { next(e); }
 }
 
+/* ---------------------- Invoices ---------------------- */
+async function invoiceMy(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const order = await Order.findOne({ _id: req.params.id, customerId: uid }).lean();
+    if (!order) return res.status(404).send('Order not found');
+
+    renderInvoice(res, order);
+  } catch (e) { next(e); }
+}
+
+async function invoiceAdmin(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) return res.status(404).send('Order not found');
+
+    renderInvoice(res, order);
+  } catch (e) { next(e); }
+}
+async function requestCancelMy(req, res, next) {
+  try {
+    const uid = req.session?.user?._id;
+    if (!uid) return res.redirect('/auth/login');
+
+    const o = await Order.findOne({ _id: req.params.id, customerId: uid });
+    if (!o) return res.status(404).send('Order not found');
+
+    // Only allow while not shipped/delivered/cancelled
+    if (['Shipped', 'Delivered', 'Cancelled'].includes(o.status)) {
+      req.session.flash = 'This order can no longer be cancelled.';
+      return res.redirect(`/account/orders/${o._id}`);
+    }
+
+    const note = String(req.body.note || '').slice(0, 500);
+    o.timeline = o.timeline || [];
+    o.timeline.push({
+      at: new Date(),
+      status: 'Cancel Requested',
+      note: note || 'Customer requested cancellation.',
+    });
+
+    await o.save();
+
+    req.session.flash = 'We received your cancellation request.';
+    res.redirect(`/account/orders/${o._id}`);
+  } catch (e) { next(e); }
+}
+
 module.exports = {
+  // customer
   myOrders,
   myOrderShow,
   uploadReceipt,
+  requestCancel,
+  requestReturn,
+
+  // admin
   adminList,
   adminShow,
   adminProcess,
@@ -372,4 +629,13 @@ module.exports = {
   adminExportCsv,
   adminDashboard,
   adminMarkPaid,
+  adminCancelApprove,
+  adminCancelDeny,
+  adminReturnApprove,
+  adminReturnDeny,
+
+  // pdf
+  invoiceMy,
+  invoiceAdmin,
+   requestCancelMy,
 };
