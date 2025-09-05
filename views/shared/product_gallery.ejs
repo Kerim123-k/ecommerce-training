@@ -1,32 +1,22 @@
-<!-- views/shared/product_gallery.ejs -->
 <%
-// expects: { item, images }
-// images: array of urls; item: product doc (used only for alt text)
-const imgs = Array.isArray(images) && images.length
-  ? images
-  : (item && item.image ? [item.image] : []);
+  const it   = (typeof item !== 'undefined' && item) ? item : {};
+  const imgs = (Array.isArray(images) && images.length) ? images : (it.image ? [it.image] : []);
 %>
 
-<style>
-  .pg-wrap{display:grid;grid-template-columns:1fr;gap:14px}
-  .pg-main{width:100%;border-radius:8px;overflow:hidden;background:#fff}
-  .pg-main img{display:block;width:100%;height:auto}
-  .pg-thumbs{display:flex;gap:10px;flex-wrap:wrap}
-  .pg-thumb{border:0;padding:0;background:#fff;border-radius:8px;cursor:pointer;outline:none}
-  .pg-thumb img{width:92px;height:92px;object-fit:cover;border-radius:8px;border:2px solid transparent}
-  .pg-thumb.active img{border-color:#ff7a00}
-</style>
-
-<div class="pg-wrap">
+<div class="product-gallery">
   <div class="pg-main">
-    <img id="pg-main" src="<%= imgs[0] || '' %>" alt="<%= (item&&item.title) || '' %>">
+    <% if (imgs.length) { %>
+      <img src="<%= imgs[0] %>" alt="<%= it.title || '' %>" loading="eager">
+    <% } else { %>
+      <img src="https://via.placeholder.com/800x600?text=No+Image" alt="">
+    <% } %>
   </div>
 
   <% if (imgs.length > 1) { %>
     <div class="pg-thumbs">
-      <% imgs.forEach(function(src, idx){ %>
-        <button class="pg-thumb <%= idx===0 ? 'active' : '' %>" type="button" data-pg-src="<%= src %>">
-          <img src="<%= src %>" alt="">
+      <% imgs.forEach((src, i) => { %>
+        <button type="button" class="pg-thumb <%= i === 0 ? 'is-active' : '' %>" data-src="<%= src %>">
+          <img src="<%= src %>" alt="" loading="lazy">
         </button>
       <% }) %>
     </div>
@@ -34,17 +24,18 @@ const imgs = Array.isArray(images) && images.length
 </div>
 
 <script>
-  (function(){
-    const main = document.getElementById('pg-main');
-    if(!main) return;
-    const btns = document.querySelectorAll('.pg-thumb');
-    btns.forEach(btn=>{
-      btn.addEventListener('click', function(){
-        const next = this.getAttribute('data-pg-src');
-        if(next){ main.src = next; }
-        document.querySelectorAll('.pg-thumb.active').forEach(b=>b.classList.remove('active'));
-        this.classList.add('active');
-      });
+(function () {
+  const root = document.currentScript.previousElementSibling;
+  if (!root) return;
+  const main = root.querySelector('.pg-main img');
+  root.querySelectorAll('.pg-thumb').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = btn.getAttribute('data-src');
+      if (!src || !main) return;
+      main.src = src;
+      root.querySelectorAll('.pg-thumb.is-active').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
     });
-  })();
+  });
+})();
 </script>

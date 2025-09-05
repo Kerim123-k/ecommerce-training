@@ -1,166 +1,71 @@
-<%- include('../shared/header') %>
-<h1><%= currentCategory ? currentCategory.name : 'Shop' %></h1>
+<%- include('../shared/header', { title: 'Storefront' }) %>
 
-<!-- Breadcrumbs (only on category pages) -->
-<% if (currentCategory) { %>
-  <nav class="muted" style="margin:-6px 0 10px;">
-    <a href="/products">All products</a>
-    <% (breadcrumbs || []).forEach(b => { %>
-      / <a href="/c/<%= b.slug %>"><%= b.name %></a>
-    <% }) %>
-    / <strong><%= currentCategory.name %></strong>
-  </nav>
-<% } %>
+<h1 style="margin:8px 0 6px;">Storefront</h1>
 
-<!-- Filters -->
-<form method="GET" class="filters" style="display:flex; gap:12px; margin-bottom:16px; align-items:center; flex-wrap:wrap;">
-  <input type="text" name="q" value="<%= q || '' %>" placeholder="Search title or SKU" />
-
+<form method="GET" class="filters">
+  <input type="text" name="q" value="<%= q || '' %>" placeholder="Search products…">
   <select name="cat">
     <option value="">All categories</option>
     <% (cats || []).forEach(c => { %>
       <option value="<%= c._id %>" <%= String(cat||'')===String(c._id)?'selected':'' %>><%= c.name %></option>
     <% }) %>
   </select>
-
-  <select name="sort">
-    <option value="new"        <%= sort==='new'?'selected':'' %>>Newest</option>
-    <option value="price_asc"  <%= sort==='price_asc'?'selected':'' %>>Price: Low → High</option>
-    <option value="price_desc" <%= sort==='price_desc'?'selected':'' %>>Price: High → Low</option>
-    <option value="top"        <%= sort==='top'?'selected':'' %>>Top rated</option>
+  <select name="sort" onchange="this.form.submit()">
+    <option value="new" <%= sort==='new' ? 'selected' : '' %>>Newest</option>
+    <option value="price_asc" <%= sort==='price_asc' ? 'selected' : '' %>>Price: Low to High</option>
+    <option value="price_desc" <%= sort==='price_desc' ? 'selected' : '' %>>Price: High to Low</option>
   </select>
-
-  <button class="btn" type="submit">Apply</button>
-</form>
-
-<!-- Result count -->
-<div class="muted" style="margin-bottom:12px;">
-  <%= total || 0 %> result<%= (total||0)===1?'':'s' %>
-</div>
-
-<!-- Heart styles -->
-<style>
-  .card { position: relative; }
-  .wish-btn {
-    position: absolute; top: 8px; right: 8px; z-index: 5;
-    background: transparent; border: 1px solid #ddd;
-    padding: 6px 10px; border-radius: 8px; color: #888; cursor: pointer;
-  }
-  .wish-btn.is-active {
-    color: #e0245e; border-color: #e0245e33; background: #e0245e10;
-  }
-</style>
-
-<!-- Product grid -->
-<div class="grid">
-  <% const list = Array.isArray(products) ? products : []; %>
-  <% if (!list.length) { %><p>No products yet.</p><% } %>
-
-  <% list.forEach(p => {
-       // image: handle array, string, or empty; normalize to https
-       let img = '';
-       if (Array.isArray(p.images) && p.images[0]) img = p.images[0];
-       else if (typeof p.images === 'string' && p.images.trim()) img = p.images.trim();
-       else if (p.image) img = String(p.image);
-       if (!img) img = 'https://upload.wikimedia.org/wikipedia/commons/6/6e/Basketball.png';
-       if (img.startsWith('//')) img = 'https:' + img;
-       if (img.startsWith('http://')) img = img.replace(/^http:\/\//, 'https://');
-
-       const inStock = Number(p.stockQty || 0) > 0;
-
-       // link: prefer slug, else fall back to id route
-       const detailsHref = (p.slug && String(p.slug).trim())
-         ? '/p/' + p.slug
-         : '/products/id/' + p._id;
-
-       // rating
-       const avg = Number(p.ratingAvg || 0);
-       const cnt = Number(p.ratingCount || 0);
-       const stars = Math.max(0, Math.min(5, Math.round(avg)));
-
-       // wishlist state for this card
-       const inWish = Array.isArray(wishlistIds) && wishlistIds.includes(String(p._id));
-  %>
-    <div class="card">
-      <!-- ♥ wishlist toggle -->
-      <button
-        class="wish-btn <%= inWish ? 'is-active' : '' %>"
-        type="button"
-        data-wish
-        data-id="<%= p._id %>"
-        title="<%= inWish ? 'Remove from wishlist' : 'Add to wishlist' %>">♥</button>
-
-      <a href="<%= detailsHref %>"><img src="<%= img %>" alt="<%= p.title %>"></a>
-
-      <div class="pad">
-        <h3><a href="<%= detailsHref %>"><%= p.title %></a></h3>
-        <div class="muted">SKU <%= p.sku %></div>
-        <div class="price">₺ <%= Number(p.price || 0).toFixed(2) %></div>
-
-        <!-- Stars + count -->
-        <div class="muted" style="margin-top:4px;">
-          <% if (cnt > 0) { %>
-            <span aria-label="Rating">
-              <% for (let s=0; s<stars; s++) { %>★<% } %><% for (let s=stars; s<5; s++) { %>☆<% } %>
-            </span>
-            <span>(<%= cnt %>)</span>
-          <% } else { %>
-            <span>☆ ☆ ☆ ☆ ☆ (0)</span>
-          <% } %>
-        </div>
-      </div>
-
-      <div class="actions">
-        <% if (inStock) { %>
-          <form method="POST" action="/cart/add/<%= p._id %>" style="flex:1">
-            <input type="hidden" name="qty" value="1">
-            <button class="btn btn--brand" type="submit">Add to cart</button>
-          </form>
-          <a href="<%= detailsHref %>" class="btn">Details</a>
-        <% } else { %>
-          <button class="btn" type="button" disabled>Out of stock</button>
-        <% } %>
-      </div>
-    </div>
-  <% }) %>
-</div>
-
-<!-- Pagination -->
-<% if ((pages || 1) > 1) { %>
-  <div class="pagination" style="margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;">
-    <% for (let p=1; p<=pages; p++) { %>
-      <a class="btn <%= p===page?'active':'' %>"
-         href="?q=<%= encodeURIComponent(q || '') %>&cat=<%= encodeURIComponent(cat || '') %>&sort=<%= sort || 'new' %>&page=<%= p %>">
-        <%= p %>
-      </a>
+  <div style="grid-column:1 / -1; display:flex; gap:8px;">
+    <button class="btn btn--brand" type="submit">Apply</button>
+    <% if (q || cat || (sort && sort!=='new')) { %>
+      <a class="btn" href="/products">Reset</a>
     <% } %>
   </div>
+</form>
+
+<% if (!products || !products.length) { %>
+  <div class="card pad">
+    <strong>No products found.</strong>
+    <div class="muted">Try clearing filters or searching something else.</div>
+  </div>
+<% } else { %>
+  <div class="product-grid">
+    <% products.forEach(p => {
+         const img = (Array.isArray(p.images) && p.images.length) ? p.images[0] : (p.image || '');
+         const href = p.slug ? ('/p/' + p.slug) : ('/products/id/' + p._id);
+    %>
+      <article class="product-card">
+        <a class="thumb" href="<%= href %>">
+          <% if (img) { %>
+            <img
+              src="<%= img %>"
+              alt="<%= p.title %>"
+              loading="lazy"
+              decoding="async"
+            >
+          <% } else { %>
+            <img
+              src="https://via.placeholder.com/600x450?text=No+Image"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            >
+          <% } %>
+        </a>
+        <div class="body">
+          <a class="title" href="<%= href %>"><%= p.title %></a>
+          <div class="price">₺ <%= Number(p.price || 0).toFixed(2) %></div>
+          <div class="actions">
+            <form method="POST" action="/cart/add/<%= p._id %>">
+              <input type="hidden" name="qty" value="1">
+              <button class="btn btn--brand" type="submit">Add to cart</button>
+            </form>
+            <a class="btn" href="<%= href %>">View</a>
+          </div>
+        </div>
+      </article>
+    <% }) %>
+  </div>
 <% } %>
-
-<script>
-  // Wishlist toggle for all cards + live badge update
-  (function () {
-    const buttons = document.querySelectorAll('[data-wish]');
-    const badge = document.querySelector('[data-wishlist-count]');
-
-    async function toggle(id, btn) {
-      try {
-        const res = await fetch(`/wishlist/toggle/${encodeURIComponent(id)}`, {
-          method: 'POST',
-          headers: { 'X-Requested-With': 'fetch' }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.inWishlist) btn.classList.add('is-active');
-        else btn.classList.remove('is-active');
-        if (badge) badge.textContent = data.count;
-      } catch (e) {}
-    }
-
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => toggle(btn.dataset.id, btn));
-    });
-  })();
-</script>
 
 <%- include('../shared/footer') %>

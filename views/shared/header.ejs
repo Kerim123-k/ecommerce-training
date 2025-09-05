@@ -4,58 +4,82 @@
 <head>
   <meta charset="utf-8" />
   <title><%= typeof title !== 'undefined' ? title : 'Training Shop' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <nav class="topnav">
     <div class="bar">
-      <a href="/products">Storefront</a>
+      <a class="nav-brand" href="/products">Training Shop</a>
 
-      <% if (currentUser && currentUser.role === 'Admin') { %>
-        <a href="/admin/reviews">Admin: Reviews</a>
-        <a href="/admin/dashboard">Admin: Dashboard</a>
-        <a href="/admin/products">Admin: Products</a>
-        <a href="/admin/categories">Admin: Categories</a>
-        <a href="/admin/coupons">Admin: Coupons</a>
-        <a href="/admin/orders">Admin: Orders</a>
-      <% } %>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navlinks">Menu</button>
 
-      <span class="spacer"></span>
+      <div id="navlinks" class="nav-links">
+        <% if (currentUser && currentUser.role === 'Admin') { %>
+          <a href="/admin/dashboard">Admin Dashboard</a>
+          <a href="/admin/products">Admin Products</a>
+          <a href="/admin/categories">Admin Categories</a>
+          <a href="/admin/coupons">Admin Coupons</a>
+          <a href="/admin/orders">Admin Orders</a>
+          <a href="/admin/reviews">Admin Reviews</a>
+        <% } %>
 
-      <a href="/cart" class="btn">Cart <span class="badge"><%= cartCount %></span></a>
-
-      <% if (currentUser) { %>
-        <!-- Wishlist (single heart icon with count) -->
         <a href="/wishlist" class="btn" title="Wishlist">
           <span class="heart-icon <%= (wishlistCount||0) > 0 ? 'has-items' : '' %>" aria-hidden="true">♥</span>
           <span class="badge" data-wishlist-count><%= wishlistCount || 0 %></span>
         </a>
 
-        <style>
-          .heart-icon { font-size: 16px; color: #888; margin-right: 6px; }
-          .heart-icon.has-items { color: #e0245e; }
-        </style>
+        <a href="/cart" class="btn">Cart <span class="badge"><%= cartCount %></span></a>
 
-        <!-- New: top-level Account hub link -->
-        <a href="/account" class="btn">My Account</a>
+        <% if (currentUser) { %>
+          <a href="/account" class="btn">My Account</a>
+          <a href="/account/orders" class="btn">My Orders</a>
+          <a href="/account/addresses" class="btn">My Addresses</a>
+          <span class="small">Hello, <%= currentUser.name || currentUser.email %></span>
+          <form method="POST" action="/auth/logout" style="display:inline">
+            <button type="submit" class="btn">Logout</button>
+          </form>
+        <% } else { %>
+          <a href="/auth/login" class="btn">Login</a>
+          <a href="/auth/register" class="btn btn--brand">Register</a>
+        <% } %>
+      </div>
 
-        <!-- Direct shortcuts (keep if you like having both) -->
-        <a href="/account/orders" class="btn">My Orders</a>
-        <a href="/account/addresses" class="btn">My Addresses</a>
-
-        <span class="small">Hello, <%= currentUser.name || currentUser.email %></span>
-        <form method="POST" action="/auth/logout" style="display:inline">
-          <button type="submit" class="btn">Logout</button>
-        </form>
-      <% } else { %>
-        <a href="/auth/login" class="btn">Login</a>
-        <a href="/auth/register" class="btn btn--brand">Register</a>
-      <% } %>
+      <span class="spacer"></span>
     </div>
   </nav>
 
   <% if (banner) { %>
-    <div class="alert alert-warning"><%= banner %></div>
+    <div class="alert alert-warning container"><%= banner %></div>
   <% } %>
 
   <main class="container">
+
+  <style>
+    /* tiny bit to make the heart icon not look broken if CSS misses it */
+    .heart-icon { font-size: 16px; color: #888; margin-right: 6px; }
+    .heart-icon.has-items { color: #e0245e; }
+    /* mobile nav helper */
+    .nav-links { display:flex; gap:12px; align-items:center; }
+    @media (max-width: 768px) {
+      .nav-toggle { display:inline-flex; }
+      .nav-links { display:none; flex-direction:column; align-items:flex-start; padding:10px 0; }
+      .nav-links.open { display:flex; }
+    }
+    @media (min-width: 769px) {
+      .nav-toggle { display:none; }
+    }
+  </style>
+
+  <script>
+    // simple menu toggle on mobile
+    (function(){
+      const btn = document.querySelector('.nav-toggle');
+      const links = document.getElementById('navlinks');
+      if (!btn || !links) return;
+      btn.addEventListener('click', function(){
+        const open = links.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+  </script>

@@ -1,32 +1,31 @@
-<!-- views/storefront/show.ejs -->
 <%- include('../shared/header', { title: (product && product.title) || 'Product' }) %>
 
 <%
-// Normalize images for gallery
-const images = Array.isArray(product?.images) && product.images.length
-  ? product.images
-  : (product?.image ? [product.image] : []);
+  // Normalize images for gallery
+  const images = Array.isArray(product?.images) && product.images.length
+    ? product.images
+    : (product?.image ? [product.image] : []);
 %>
 
-<section class="container" style="margin-top:20px;">
-  <!-- Gallery -->
-  <%- include('../shared/product_gallery', { item: product, images }) %>
+<section class="product-show">
+  <div class="product-show__gallery">
+    <%- include('../shared/product_gallery', { item: product, images }) %>
+  </div>
 
-  <!-- Info -->
-  <div style="margin-top:18px;">
+  <aside class="product-show__info">
     <h1><%= product.title %></h1>
     <p class="muted">SKU <%= product.sku %></p>
-    <p style="font-size:20px;font-weight:600;">₺ <%= Number(product.price || 0).toFixed(2) %></p>
+    <p class="price-lg">₺ <%= Number(product.price || 0).toFixed(2) %></p>
 
     <form method="POST" action="/cart/add/<%= product._id %>" class="hstack" style="gap:10px;">
-      <input type="number" name="qty" value="1" min="1" class="input" style="width:80px;">
+      <input type="number" name="qty" value="1" min="1" class="input" style="width:90px;">
       <button class="btn btn--brand" type="submit">Add to cart</button>
       <a class="btn" href="/products">Back to shop</a>
     </form>
-  </div>
+  </aside>
 </section>
 
-<section class="container" style="margin-top:28px;">
+<section class="block" style="margin-top:28px;">
   <h2>Reviews</h2>
   <p class="muted">No one has reviewed this product yet.</p>
 </section>

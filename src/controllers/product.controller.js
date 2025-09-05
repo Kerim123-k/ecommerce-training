@@ -15,6 +15,18 @@ const Review   = require('../models/Review');
 /* ------------------------------------------------------------------ */
 const toArray = v => (Array.isArray(v) ? v : (v ? [v] : []));
 
+
+async function buildRating(productId) {
+  const [stats] = await Review.aggregate([
+    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'Approved' } },
+    { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: '$rating' } } },
+  ]);
+  return {
+    count: stats?.count || 0,
+    avg: stats ? Number(stats.avg.toFixed(2)) : 0,
+  };
+}
+
 function relFromPublic(absPath) {
   // ".../public/uploads/products/2025/08/file.jpg" -> "/uploads/products/2025/08/file.jpg"
   if (!absPath) return '';
@@ -203,35 +215,57 @@ exports.storefront = async (req, res, next) => {
 exports.showEither = async (req, res, next) => {
   try {
     const key = String(req.params.slugOrId || '').trim();
-    let product = null;
 
-    // 1) try slug
-    if (key) {
-      product = await Product.findOne({
-        slug: key, status: 'Active', isDeleted: { $ne: true }
-      }).lean();
-    }
-    // 2) fallback to id if looks like ObjectId
+    let product = await Product.findOne({
+      slug: key, status: 'Active', isDeleted: { $ne: true }
+    }).populate('categories').lean();
+
     if (!product && mongoose.isValidObjectId(key)) {
       product = await Product.findOne({
         _id: key, status: 'Active', isDeleted: { $ne: true }
-      }).lean();
+      }).populate('categories').lean();
     }
 
-    if (!product) return res.status(404).send('Not found');
+    if (!product) return res.status(404).send('Product not found');
 
-    const qty = Number(product.stockQty || 0);
+    const qty      = Number(product.stockQty || 0);
     const inStock  = qty > 0;
     const lowStock = product.trackInventory !== false && inStock && qty <= 5;
 
-    product.images = Array.isArray(product.images)
-      ? product.images
-      : (product.image ? [product.image] : []);
+    const rating  = await buildRating(product._id);
+    const reviews = await Review.find({ productId: product._id, status: 'Approved' })
+      .sort({ createdAt: -1 })
+      .lean();
 
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('storefront/show', { product, inStock, lowStock, flash });
+    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash });
+  } catch (e) { next(e); }
+};
+exports.show = async (req, res, next) => {
+  try {
+    const product = await Product.findOne({
+      slug: req.params.slug,
+      status: 'Active',
+      isDeleted: { $ne: true },
+    }).populate('categories').lean();
+
+    if (!product) return res.status(404).send('Product not found');
+
+    const qty      = Number(product.stockQty || 0);
+    const inStock  = qty > 0;
+    const lowStock = product.trackInventory !== false && inStock && qty <= 5;
+
+    const rating  = await buildRating(product._id);
+    const reviews = await Review.find({ productId: product._id, status: 'Approved' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const flash = req.session.flash || null;
+    delete req.session.flash;
+
+    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash });
   } catch (e) { next(e); }
 };
 
