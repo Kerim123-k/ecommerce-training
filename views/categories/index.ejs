@@ -1,31 +1,54 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Admin • Categories' }) %>
 
 <h1>Categories</h1>
 
 <% if (typeof banner !== 'undefined' && banner) { %>
-  <div class="alert alert-warning" style="padding:10px; border:1px solid #f3c78e; background:#fff7e6; border-radius:6px; margin:12px 0;">
-    <%= banner %>
-  </div>
+  <div class="alert alert-warning"><%= banner %></div>
 <% } %>
 
-<p><a href="/admin/categories/new">+ Add Category</a></p>
+<div class="quick-actions">
+  <a class="btn btn--brand" href="/admin/categories/new">+ Add Category</a>
+</div>
 
-<% if (!cats.length) { %>
-  <p>No categories yet.</p>
-<% } else { %>
-  <ul>
-    <% cats.forEach(c => { %>
-      <li>
-        <strong><%= c.name %></strong>
-        — <small><%= c.status %></small>
-        — <small>Products: <%= (counts && counts[String(c._id)]) || 0 %></small>
-        <a href="/admin/categories/<%= c._id %>/edit">Edit</a>
-        <form method="POST" action="/admin/categories/<%= c._id %>/delete" style="display:inline" onsubmit="return confirm('Delete this category?')">
-          <button type="submit">Delete</button>
-        </form>
-      </li>
-    <% }) %>
-  </ul>
-<% } %>
+<section class="card pad page-card">
+  <div class="section-title">All categories</div>
+
+  <% if (!(cats && cats.length)) { %>
+    <div class="alert alert-warning">
+      No categories yet. <a href="/admin/categories/new">Create your first category</a>.
+    </div>
+  <% } else { %>
+    <div style="overflow:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Status</th>
+            <th class="num">Products</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% cats.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.name %></strong></td>
+              <td><span class="pill"><%= c.status || 'Active' %></span></td>
+              <td class="num"><%= (counts && counts[String(c._id)]) || 0 %></td>
+              <td style="white-space:nowrap;">
+                <a class="btn" href="/admin/categories/<%= c._id %>/edit">Edit</a>
+                <form method="POST"
+                      action="/admin/categories/<%= c._id %>/delete"
+                      style="display:inline"
+                      onsubmit="return confirm('Delete this category? Products will simply lose this assignment.');">
+                  <button class="btn btn--danger" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
 
 <%- include('../shared/footer') %>

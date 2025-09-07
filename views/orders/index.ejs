@@ -5,7 +5,7 @@
   <input type="text" name="q" value="<%= q || '' %>" placeholder="Search order no or email" />
   <select name="status">
     <option value="">All statuses</option>
-    <% ['Paid','Processing','Shipped','Delivered','Cancelled'].forEach(s => { %>
+    <% ['Paid','Cancelled'].forEach(s => { %>
       <option value="<%= s %>" <%= status===s?'selected':'' %>><%= s %></option>
     <% }) %>
   </select>
@@ -14,7 +14,7 @@
   <button class="btn" type="submit">Apply</button>
 
   <!-- CSV export keeps current filters -->
-  <a class="btn" href="/admin/orders/export.csv?<%= [
+  <a class="btn" href="/admin/orders/export/csv?<%= [
       'q=' + encodeURIComponent(q || ''),
       'status=' + encodeURIComponent(status || ''),
       'from=' + encodeURIComponent(from || ''),

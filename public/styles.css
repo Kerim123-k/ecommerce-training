@@ -186,3 +186,337 @@ label{ font-weight:600; font-size:14px; color:var(--text); }
   outline:2px solid var(--brand);
   border-color:var(--brand);
 }
+
+/* Layout */
+.cart-page { max-width:1100px; margin:0 auto; padding:1rem; }
+.cart-layout { display:grid; grid-template-columns: 1fr 320px; gap:24px; align-items:start; }
+@media (max-width: 900px) { .cart-layout { grid-template-columns: 1fr; } }
+.totals-card { position:sticky; top:88px; background:#fff; border:1px solid #eee; border-radius:14px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.totals-card .row { display:flex; justify-content:space-between; margin:.4rem 0; }
+.muted { opacity:.7; }
+
+/* Empty state */
+.cart-empty { text-align:center; padding:48px 0; color:#667; }
+.cart-empty .btn { margin-top:12px; }
+
+/* Table look */
+.cart-table { width:100%; border-collapse:separate; border-spacing:0 10px; }
+.cart-table th { text-align:left; font-weight:600; color:#556; font-size:.9rem; }
+.cart-row { background:#fff; border:1px solid #eee; border-radius:12px; overflow:hidden; }
+.cart-table td, .cart-table th { padding:14px 16px; vertical-align:middle; }
+
+/* Qty stepper */
+.qty { display:inline-flex; align-items:center; gap:.25rem; }
+.qty button { width:2rem; height:2rem; border:1px solid #ddd; border-radius:.5rem; background:#fff; }
+.qty-input { width:3.25rem; text-align:center; padding:.25rem .5rem; }
+
+/* Alerts */
+.alert { padding:.5rem .75rem; border-radius:.5rem; margin:.5rem 0; background:#eef5ff; }
+.alert-success { background:#eaf9f0; }
+/* qty stepper — minimal styling to match your original look */
+.qty { display:inline-flex; align-items:center; gap:.25rem; }
+.qty button { width:2rem; height:2rem; border:1px solid #ddd; border-radius:.5rem; background:#fff; }
+.qty-input { text-align:center; }
+/* --- Buttons: hierarchy like big e-comm sites --- */
+.btn-group { display:flex; gap:12px; flex-wrap:wrap; }
+
+/* neutral, for Update cart */
+.btn--secondary { background:#fff; border:1px solid #d8dde6; }
+.btn--secondary:hover { background:#f7f9fc; box-shadow:0 2px 6px rgba(0,0,0,.06); }
+
+/* quiet link-like button, for Continue shopping */
+.btn--ghost { background:transparent; border:1px solid #e7ebf2; }
+.btn--ghost:hover { background:#f8f9fb; }
+
+/* gentle-danger outline, for Remove / Clear cart */
+.btn--danger-outline { color:#b42318; background:#fff; border:1px solid #f1b8b8; }
+.btn--danger-outline:hover { background:#ffecec; border-color:#e58b8b; }
+
+/* keep your existing primary .btn--brand for Checkout */
+
+/* consistent interaction states */
+.btn { transition: background .15s ease, box-shadow .15s ease, transform .02s; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid #4c8bf7; outline-offset: 2px; }
+.btn[disabled] { opacity:.6; cursor:not-allowed; }
+
+/* --- Qty stepper micro-polish --- */
+.qty { display:inline-flex; align-items:center; gap:.25rem; }
+.qty button { width:2rem; height:2rem; border:1px solid #d8dde6; border-radius:.5rem; background:#fff; }
+.qty button:hover { background:#f7f9fc; }
+.qty button:active { transform: translateY(1px); }
+.qty-input { width:70px; text-align:center; padding:.25rem .5rem; }
+
+/* --- Numbers line up cleanly --- */
+.price, .total, #subtotalVal { font-variant-numeric: tabular-nums; }
+
+/* Quick actions row */
+.quick-actions { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 18px; }
+
+/* KPI polish */
+.kpi-card .kpi-value { font-size:28px; font-weight:700; font-variant-numeric: tabular-nums; }
+.kpi-card .kpi-trend { display:flex; align-items:center; gap:8px; margin-top:8px; color:#5a7; }
+.kpi-card .kpi-sub { margin-top:4px; }
+
+/* Status list */
+.status-list { margin:8px 0 0 0; padding-left:0; display:flex; gap:10px; flex-wrap:wrap; list-style:none; }
+.status-list li { display:flex; align-items:center; gap:6px; }
+
+/* Badges */
+.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem; line-height:1.6; }
+.badge--warn { background:#fff4e5; border:1px solid #ffd6a6; color:#8a4b00; }
+.badge--status-new       { background:#eef5ff; border:1px solid #cfe0ff; color:#184a90; }
+.badge--status-paid      { background:#eaf9f0; border:1px solid #c9efd7; color:#215a36; }
+.badge--status-shipped   { background:#f1f7ff; border:1px solid #d6e6ff; color:#204b8c; }
+.badge--status-cancelled { background:#ffecec; border:1px solid #f3c2c2; color:#9a1e1e; }
+
+/* Numbers line up nicely */
+.table td, .table th { font-variant-numeric: tabular-nums; }
+
+
+/* Quick actions */
+.quick-actions { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 18px; }
+
+/* KPI polish */
+.kpi-card .kpi-value { font-size:28px; font-weight:700; font-variant-numeric: tabular-nums; }
+.kpi-card .kpi-trend { display:flex; align-items:center; gap:8px; margin-top:8px; color:#5a7; }
+.kpi-card .kpi-sub { margin-top:4px; }
+
+/* Status list + badges (clickable) */
+.status-list { margin:8px 0 0 0; padding-left:0; display:flex; gap:10px; flex-wrap:wrap; list-style:none; }
+.status-list li { display:flex; align-items:center; gap:6px; }
+.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem; line-height:1.6; text-decoration:none; }
+.badge--warn { background:#fff4e5; border:1px solid #ffd6a6; color:#8a4b00; }
+.badge--status-new       { background:#eef5ff; border:1px solid #cfe0ff; color:#184a90; }
+.badge--status-paid      { background:#eaf9f0; border:1px solid #c9efd7; color:#215a36; }
+.badge--status-shipped   { background:#f1f7ff; border:1px solid #d6e6ff; color:#204b8c; }
+.badge--status-cancelled { background:#ffecec; border:1px solid #f3c2c2; color:#9a1e1e; }
+
+/* Table niceties */
+.table tr:hover { background:#fafbff; }
+.table td.num, .table th.num { text-align:right; }
+.table td, .table th { font-variant-numeric: tabular-nums; }
+
+
+
+
+
+
+
+/* Products list – subtle cues and inputs */
+tr.row-low { background:#fff8f0; }     /* low stock (1–5) */
+tr.row-oos { background:#fff1f1; }     /* out of stock (0) */
+
+#prodTools .input {
+  border:1px solid #e7ebf2;
+  border-radius:10px;
+  padding:6px 10px;
+}
+#prodTools .input:focus {
+  outline:2px solid #4c8bf7;
+  outline-offset:1px;
+}
+
+/* Right-align numeric columns */
+.table td.num, .table th.num { text-align:right; }
+
+/* If you didn't already add badges earlier, keep these: */
+.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem; line-height:1.6; }
+.badge--warn { background:#fff4e5; border:1px solid #ffd6a6; color:#8a4b00; }
+
+
+/* --- Section cards and titles --- */
+.page-card { border-radius:16px; box-shadow:0 8px 24px rgba(19,20,36,.04); margin:14px 0; }
+.section-title { font-weight:700; margin-bottom:10px; }
+
+/* --- Form grid --- */
+.form-grid { display:grid; gap:12px; }
+.form-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.field--full { grid-column: 1 / -1; }
+@media (max-width: 900px){ .form-grid.cols-2 { grid-template-columns: 1fr; } }
+.field label { font-weight:600; margin-bottom:4px; display:block; }
+.help { font-size:.85rem; color:#6b7280; margin-top:4px; }
+
+/* --- Currency input with prefix (reuses earlier styles if present) --- */
+.input-prefix { display:flex; align-items:center; border:1px solid #e7ebf2; border-radius:10px; overflow:hidden; }
+.input-prefix > span { background:#f7f9fc; border-right:1px solid #e7ebf2; padding:6px 10px; color:#667; }
+.input-prefix > input { border:0; padding:8px 10px; width:100%; }
+.input-prefix > input:focus { outline:2px solid #4c8bf7; outline-offset:0; }
+
+
+
+/* --- Image preview --- */
+.img-preview { margin-top:10px; }
+.img-preview img { display:block; max-width:420px; width:100%; border-radius:12px; border:1px solid #e7ebf2; }
+
+/* --- Sticky action bar --- */
+.action-bar { position:sticky; bottom:0; z-index:5; margin-top:18px; }
+.action-bar__inner { backdrop-filter: blur(6px); background: rgba(255,255,255,.85); border-top:1px solid #eef1f6; padding:10px; display:flex; gap:10px; }
+
+/* Section cards and titles */
+.page-card { border-radius:16px; box-shadow:0 8px 24px rgba(19,20,36,.04); margin:14px 0; }
+.section-title { font-weight:800; font-size:1.05rem; color:#0f172a; border-bottom:1px solid #eef2f7; padding-bottom:6px; margin-bottom:12px; }
+
+/* Form grid */
+.form-grid { display:grid; gap:12px; }
+.form-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.field--full { grid-column: 1 / -1; }
+@media (max-width: 900px){ .form-grid.cols-2 { grid-template-columns: 1fr; } }
+.field label { font-weight:600; margin-bottom:4px; display:block; }
+.help { font-size:.85rem; color:#6b7280; margin-top:4px; }
+
+/* Make inputs/selects more noticeable */
+input, select, textarea { border:1px solid #d6dde8; border-radius:10px; padding:8px 10px; }
+select { padding-right:38px; appearance:none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23677' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+input:focus, select:focus, textarea:focus {
+  outline:2px solid #2563eb33; border-color:#7aa2ff;
+}
+
+/* Currency prefix input */
+.input-prefix { display:flex; align-items:center; border:1px solid #d6dde8; border-radius:10px; overflow:hidden; }
+.input-prefix > span { background:#f3f6fb; border-right:1px solid #d6dde8; padding:6px 10px; color:#495057; }
+.input-prefix > input { border:0; padding:8px 10px; width:100%; }
+.input-prefix > input:focus { outline:2px solid #4c8bf7; outline-offset:0; }
+
+/* Robust switch (fixes the tiny-floating-dot issue) */
+/* Robust switch (Track inventory) */
+
+
+/* Slightly more space above the stock help text */
+#stockWrap .help { margin-top: 6px; }
+
+
+/* Image preview */
+.img-preview { margin-top:10px; }
+.img-preview img { display:block; max-width:420px; width:100%; border-radius:12px; border:1px solid #e7ebf2; }
+
+/* Sticky action bar */
+.action-bar { position:sticky; bottom:0; z-index:5; margin-top:18px; }
+.action-bar__inner { backdrop-filter: blur(6px); background: rgba(255,255,255,.88); border-top:1px solid #eef1f6; padding:10px; display:flex; gap:10px; }
+
+/* Ghost button more visible */
+.btn.btn--ghost { border:1px solid #e7ebf2; }
+.btn.btn--ghost:hover { background:#f5f7fb; }
+/* Align the two columns (Status + Switch) baseline */
+.form-grid.cols-2 { align-items: end; }
+
+/* ==== Robust inline switch (prevents overlap with label text) ==== */
+.switch-wrap{
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  cursor:pointer;
+  user-select:none;
+  line-height:1;            /* avoid tall line box that causes misalignment */
+}
+
+/* keep global .field label from forcing block layout here */
+.field .switch-wrap label{ display:inline-block; margin-bottom:0; }
+
+.switch-input{
+  position:absolute;
+  opacity:0;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+}
+
+.switch-ui{
+  display:inline-block;
+  width:48px;
+  height:28px;
+  background:#e5e7eb;
+  border:1px solid #cbd5e1;
+  border-radius:999px;
+  position:relative;
+  transition:background .2s, border-color .2s;
+}
+.switch-ui::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:22px;
+  height:22px;
+  background:#fff;
+  border-radius:50%;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+  transition:transform .2s;
+}
+
+/* checked state */
+.switch-input:checked + .switch-ui{
+  background:#2563eb;
+  border-color:#2563eb;
+}
+.switch-input:checked + .switch-ui::after{
+  transform:translateX(20px);  /* 48 - 22 - (3+3) = 20 */
+}
+
+.switch-text{
+  font-weight:600;
+  color:#0f172a;
+  white-space:nowrap;
+}
+
+/* a bit more breathing room for the stock hint */
+#stockWrap .help{ margin-top:6px; }
+
+
+/* Put row-1 and row-2 on neat baselines */
+.form-grid.cols-2 { align-items: start; }
+
+/* Label-only cell in row 1 (so its height doesn't add extra gap) */
+.field--labelonly label { margin-bottom: 0; }
+
+/* First row alignment in the Inventory & status grid */
+.form-grid.cols-2 .field--labelonly{
+  display: flex;
+  align-items: center;   /* vertically center the text */
+  min-height: 28px;      /* match the switch track height */
+}
+.form-grid.cols-2 .field--labelonly label{
+  margin: 0;
+  line-height: 1;        /* avoid extra leading pushing it up/down */
+}
+/* Kill the extra 4px coming from the hidden label in fields */
+.field .sr-only {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Keep the left label row vertically centered with the switch track */
+.form-grid.cols-2 .field--labelonly {
+  display: flex;
+  align-items: center;   /* same vertical middle as the switch */
+  min-height: 28px;      /* match the switch track height */
+}
+
+
+/* (Optional) keep the two rows’ top offsets the same */
+#stockWrap { margin-top: 8px; }   /* already present; mirrors the left row spacing */
+/* --- Force perfect alignment in Inventory & status --- */
+/* First row is exactly the height of the switch track. */
+.inv-grid{
+  grid-template-rows: 28px auto;   /* row-1 fixed, row-2 auto */
+  align-items: start;              /* don't stretch */
+}
+
+/* Left cell in row-1: center the label inside that 28px row */
+.inv-grid .field--labelonly{
+  display:flex;
+  align-items:center;
+  height:28px;                     /* match switch height exactly */
+}
+.inv-grid .field--labelonly label{
+  margin:0;
+  line-height:1;                   /* no extra leading */
+}
+
+/* Make sure the switch track is 28px high for a guaranteed match */
+.switch-ui{
+  height:28px;
+}

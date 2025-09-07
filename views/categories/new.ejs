@@ -1,30 +1,59 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Admin • New category' }) %>
+
 <h1>Add Category</h1>
 
 <% if (errors && errors.length) { %>
-  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+  <div class="alert alert-error">
+    <ul style="margin:0; padding-left:18px;">
+      <% errors.forEach(e => { %><li><%= e.msg %></li><% }) %>
+    </ul>
+  </div>
 <% } %>
 
-<form method="POST" action="/admin/categories" class="form">
-  <label>Name* <input name="name" value="<%= (values && values.name) || '' %>" required></label>
+<form method="POST" action="/admin/categories" class="vstack" style="gap:12px; max-width:720px;">
+  <section class="card pad page-card">
+    <div class="section-title">Details</div>
 
-  <label>Parent (optional)
-    <select name="parentId">
-      <option value="">— None —</option>
-      <% (parents||[]).forEach(p => { %>
-        <option value="<%= p._id %>" <%= (values && values.parentId==String(p._id)) ? 'selected' : '' %>><%= p.name %></option>
-      <% }) %>
-    </select>
-  </label>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label for="name">Name*</label>
+        <input id="name" name="name" value="<%= (values && values.name) || '' %>" required>
+      </div>
 
-  <label>Status
-    <select name="status">
-      <option <%= (values && values.status==='Active') ? 'selected':'' %>>Active</option>
-      <option <%= (values && values.status==='Hidden') ? 'selected':'' %>>Hidden</option>
-    </select>
-  </label>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="Active" <%= (values && values.status==='Active') ? 'selected' : '' %>>Active</option>
+          <option value="Hidden" <%= (values && values.status==='Hidden') ? 'selected' : '' %>>Hidden</option>
+        </select>
+      </div>
 
-  <label>Description <input name="description" value="<%= (values && values.description) || '' %>"></label>
-  <button type="submit">Save</button>
+      <div class="field field--full">
+        <label for="parentId">Parent (optional)</label>
+        <select id="parentId" name="parentId">
+          <option value="">— None —</option>
+          <% (parents||[]).forEach(p => { %>
+            <option value="<%= p._id %>" <%= (values && values.parentId==String(p._id)) ? 'selected' : '' %>>
+              <%= p.name %>
+            </option>
+          <% }) %>
+        </select>
+        <div class="help">Use this to nest categories (e.g., “Shoes ▸ Running”).</div>
+      </div>
+
+      <div class="field field--full">
+        <label for="description">Description</label>
+        <input id="description" name="description" value="<%= (values && values.description) || '' %>">
+      </div>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <div class="action-bar__inner">
+      <button class="btn btn--brand" type="submit">Save</button>
+      <a class="btn" href="/admin/categories">Cancel</a>
+    </div>
+  </div>
 </form>
+
 <%- include('../shared/footer') %>

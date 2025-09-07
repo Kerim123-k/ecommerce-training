@@ -1,26 +1,257 @@
-<%- include('../../shared/header') %>
+<%- include('../../shared/header', { title: 'Add Address' }) %>
+
 <h1>Add Address</h1>
 
 <% if (errors && errors.length) { %>
-  <div class="alert-error">
-    <ul>
-      <% errors.forEach(e => { %>
-        <li><%= e.msg %></li>
-      <% }) %>
+  <div class="alert alert-warning" style="margin:10px 0;">
+    <ul style="margin:0 0 0 16px;">
+      <% errors.forEach(e => { %><li><%= e.msg %></li><% }) %>
     </ul>
   </div>
 <% } %>
 
-<form method="POST" action="/account/addresses" class="form">
-  <label>Label <input name="label" value="<%= (values && values.label) || '' %>"></label>
-  <label>Line 1* <input name="line1" required value="<%= (values && values.line1) || '' %>"></label>
-  <label>Line 2 <input name="line2" value="<%= (values && values.line2) || '' %>"></label>
-  <label>City* <input name="city" required value="<%= (values && values.city) || '' %>"></label>
-  <label>Province <input name="province" value="<%= (values && values.province) || '' %>"></label>
-  <label>Postal Code <input name="postalCode" value="<%= (values && values.postalCode) || '' %>"></label>
-  <label>Country* <input name="country" required value="<%= (values && values.country) || 'TR' %>"></label>
-  <label>Phone <input name="phone" value="<%= (values && values.phone) || '' %>"></label>
-  <button type="submit">Save</button>
+<form id="addrForm" method="POST" action="/account/addresses" class="form" novalidate>
+  <section class="card pad page-card">
+    <div class="section-title">Address details</div>
+
+    <div class="form-grid cols-2">
+      <!-- Row 1: Country + City -->
+      <div class="field">
+        <label for="country">Country*</label>
+        <% const currentCountry = (values && values.country) ? String(values.country).toUpperCase() : 'TR'; %>
+        <select id="country" name="country" required>
+          <% if (!['TR','US','GB','DE','FR','ES','IT','NL','SE','NO','DK','FI','PL','RO','GR','PT','IE','AT','CH','CZ','HU','CA','AU','NZ','JP','KR','CN','IN','AE','SA','EG','ZA','BR','AR','MX'].includes(currentCountry)) { %>
+            <option value="<%= currentCountry %>" selected>Current (<%= currentCountry %>)</option>
+          <% } %>
+          <option value="TR" <%= currentCountry==='TR'?'selected':'' %>>Türkiye (TR)</option>
+          <option value="US" <%= currentCountry==='US'?'selected':'' %>>United States (US)</option>
+          <option value="GB" <%= currentCountry==='GB'?'selected':'' %>>United Kingdom (GB)</option>
+          <option value="DE" <%= currentCountry==='DE'?'selected':'' %>>Germany (DE)</option>
+          <option value="FR" <%= currentCountry==='FR'?'selected':'' %>>France (FR)</option>
+          <option value="ES" <%= currentCountry==='ES'?'selected':'' %>>Spain (ES)</option>
+          <option value="IT" <%= currentCountry==='IT'?'selected':'' %>>Italy (IT)</option>
+          <option value="NL" <%= currentCountry==='NL'?'selected':'' %>>Netherlands (NL)</option>
+          <option value="SE" <%= currentCountry==='SE'?'selected':'' %>>Sweden (SE)</option>
+          <option value="NO" <%= currentCountry==='NO'?'selected':'' %>>Norway (NO)</option>
+          <option value="DK" <%= currentCountry==='DK'?'selected':'' %>>Denmark (DK)</option>
+          <option value="FI" <%= currentCountry==='FI'?'selected':'' %>>Finland (FI)</option>
+          <option value="PL" <%= currentCountry==='PL'?'selected':'' %>>Poland (PL)</option>
+          <option value="RO" <%= currentCountry==='RO'?'selected':'' %>>Romania (RO)</option>
+          <option value="GR" <%= currentCountry==='GR'?'selected':'' %>>Greece (GR)</option>
+          <option value="PT" <%= currentCountry==='PT'?'selected':'' %>>Portugal (PT)</option>
+          <option value="IE" <%= currentCountry==='IE'?'selected':'' %>>Ireland (IE)</option>
+          <option value="AT" <%= currentCountry==='AT'?'selected':'' %>>Austria (AT)</option>
+          <option value="CH" <%= currentCountry==='CH'?'selected':'' %>>Switzerland (CH)</option>
+          <option value="CZ" <%= currentCountry==='CZ'?'selected':'' %>>Czechia (CZ)</option>
+          <option value="HU" <%= currentCountry==='HU'?'selected':'' %>>Hungary (HU)</option>
+          <option value="CA" <%= currentCountry==='CA'?'selected':'' %>>Canada (CA)</option>
+          <option value="AU" <%= currentCountry==='AU'?'selected':'' %>>Australia (AU)</option>
+          <option value="NZ" <%= currentCountry==='NZ'?'selected':'' %>>New Zealand (NZ)</option>
+          <option value="JP" <%= currentCountry==='JP'?'selected':'' %>>Japan (JP)</option>
+          <option value="KR" <%= currentCountry==='KR'?'selected':'' %>>South Korea (KR)</option>
+          <option value="CN" <%= currentCountry==='CN'?'selected':'' %>>China (CN)</option>
+          <option value="IN" <%= currentCountry==='IN'?'selected':'' %>>India (IN)</option>
+          <option value="AE" <%= currentCountry==='AE'?'selected':'' %>>United Arab Emirates (AE)</option>
+          <option value="SA" <%= currentCountry==='SA'?'selected':'' %>>Saudi Arabia (SA)</option>
+          <option value="EG" <%= currentCountry==='EG'?'selected':'' %>>Egypt (EG)</option>
+          <option value="ZA" <%= currentCountry==='ZA'?'selected':'' %>>South Africa (ZA)</option>
+          <option value="BR" <%= currentCountry==='BR'?'selected':'' %>>Brazil (BR)</option>
+          <option value="AR" <%= currentCountry==='AR'?'selected':'' %>>Argentina (AR)</option>
+          <option value="MX" <%= currentCountry==='MX'?'selected':'' %>>Mexico (MX)</option>
+        </select>
+      </div>
+
+      <!-- The value actually posted for "city" -->
+      <input type="hidden" id="cityCanon" name="city" value="<%= (values && values.city) || '' %>">
+
+      <!-- City text (non-TR) -->
+      <div class="field" id="cityInputWrap">
+        <label for="cityInput">City*</label>
+        <input id="cityInput" value="<%= (values && values.city) || '' %>" placeholder="City">
+      </div>
+
+      <!-- City dropdown (TR) -->
+      <div class="field" id="citySelectWrap" style="display:none;">
+        <label for="citySelect">City*</label>
+        <select id="citySelect"></select>
+      </div>
+
+      <!-- Row 2: Province / District + Postal -->
+      <!-- The value actually posted for "province" -->
+      <input type="hidden" id="provinceCanon" name="province" value="<%= (values && values.province) || '' %>">
+
+      <!-- Province text (non-TR or “Other”) -->
+      <div class="field" id="provinceInputWrap" style="display:none;">
+        <label for="provinceInput">Province / District</label>
+        <input id="provinceInput" value="<%= (values && values.province) || '' %>" placeholder="Province / District">
+      </div>
+
+      <!-- Province dropdown (TR) -->
+      <div class="field" id="provinceSelectWrap" style="display:none;">
+        <label for="provinceSelect">Province / District</label>
+        <select id="provinceSelect"></select>
+      </div>
+
+      <div class="field">
+        <label for="postalCode">Postal Code</label>
+        <input id="postalCode" name="postalCode" value="<%= (values && values.postalCode) || '' %>">
+      </div>
+
+      <!-- Row 3 -->
+      <div class="field">
+        <label for="line1">Line 1*</label>
+        <input id="line1" name="line1" required value="<%= (values && values.line1) || '' %>" placeholder="Street and number">
+      </div>
+
+      <div class="field">
+        <label for="line2">Line 2</label>
+        <input id="line2" name="line2" value="<%= (values && values.line2) || '' %>" placeholder="Apartment, suite, etc. (optional)">
+      </div>
+
+      <!-- Row 4 -->
+      <div class="field">
+        <label for="label">Label</label>
+        <input id="label" name="label" value="<%= (values && values.label) || '' %>" placeholder="Home, Office, …">
+      </div>
+
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" value="<%= (values && values.phone) || '' %>" placeholder="+90 5xx xxx xx xx">
+      </div>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <div class="action-bar__inner">
+      <button class="btn btn--brand" type="submit">Save</button>
+      <a class="btn" href="/account/addresses">Cancel</a>
+    </div>
+  </div>
 </form>
+
+<script>
+(function(){
+  // Provinces (TR)
+  const TR_PROVINCES = [
+    "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin",
+    "Aydın","Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur",
+    "Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Düzce","Edirne","Elazığ","Erzincan",
+    "Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Iğdır","Isparta","İstanbul",
+    "İzmir","Kahramanmaraş","Karabük","Karaman","Kars","Kastamonu","Kayseri","Kırıkkale","Kırklareli","Kırşehir",
+    "Kilis","Kocaeli","Konya","Kütahya","Malatya","Manisa","Mardin","Mersin","Muğla","Muş",
+    "Nevşehir","Niğde","Ordu","Osmaniye","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas",
+    "Şanlıurfa","Şırnak","Tekirdağ","Tokat","Trabzon","Tunceli","Uşak","Van","Yalova","Yozgat","Zonguldak"
+  ];
+
+  // Districts (sample set)
+  const TR_DISTRICTS = {
+    "Adana": ["Aladağ","Ceyhan","Çukurova","Feke","İmamoğlu","Karaisalı","Karataş","Kozan","Pozantı","Saimbeyli","Sarıçam","Seyhan","Tufanbeyli","Yumurtalık","Yüreğir"],
+    "Ankara": ["Altındağ","Ayaş","Bala","Beypazarı","Çamlıdere","Çankaya","Çubuk","Elmadağ","Etimesgut","Evren","Gölbaşı","Güdül","Haymana","Kahramankazan","Kalecik","Keçiören","Kızılcahamam","Mamak","Nallıhan","Polatlı","Pursaklar","Sincan","Şereflikoçhisar","Yenimahalle"],
+    "İstanbul": ["Adalar","Arnavutköy","Ataşehir","Avcılar","Bağcılar","Bahçelievler","Bakırköy","Başakşehir","Bayrampaşa","Beşiktaş","Beykoz","Beylikdüzü","Beyoğlu","Büyükçekmece","Çatalca","Çekmeköy","Esenler","Esenyurt","Eyüpsultan","Fatih","Gaziosmanpaşa","Güngören","Kadıköy","Kağıthane","Kartal","Küçükçekmece","Maltepe","Pendik","Sancaktepe","Sarıyer","Silivri","Sultanbeyli","Sultangazi","Şile","Şişli","Tuzla","Ümraniye","Üsküdar","Zeytinburnu"],
+    "İzmir": ["Aliağa","Balçova","Bayındır","Bayraklı","Bergama","Beydağ","Bornova","Buca","Çeşme","Çiğli","Dikili","Foça","Gaziemir","Güzelbahçe","Karabağlar","Karaburun","Karşıyaka","Kemalpaşa","Kınık","Kiraz","Konak","Menderes","Menemen","Narlıdere","Ödemiş","Seferihisar","Selçuk","Tire","Torbalı","Urla"],
+    "Antalya": ["Aksu","Alanya","Demre","Döşemealtı","Elmalı","Finike","Gazipaşa","Gündoğmuş","İbradı","Kaş","Kemer","Kepez","Konyaaltı","Korkuteli","Kumluca","Manavgat","Muratpaşa","Serik"],
+    "Bursa": ["Büyükorhan","Gemlik","Gürsu","Harmancık","İnegöl","İznik","Karacabey","Keles","Kestel","Mudanya","Mustafakemalpaşa","Nilüfer","Orhaneli","Orhangazi","Osmangazi","Yenişehir","Yıldırım"]
+  };
+
+  const form = document.getElementById('addrForm');
+  const country = document.getElementById('country');
+
+  // City
+  const cityCanon = document.getElementById('cityCanon');
+  const cityInputWrap = document.getElementById('cityInputWrap');
+  const citySelectWrap = document.getElementById('citySelectWrap');
+  const cityInput = document.getElementById('cityInput');
+  const citySelect = document.getElementById('citySelect');
+
+  // Province
+  const provCanon = document.getElementById('provinceCanon');
+  const provInputWrap = document.getElementById('provinceInputWrap');
+  const provSelectWrap = document.getElementById('provinceSelectWrap');
+  const provInput = document.getElementById('provinceInput');
+  const provSelect = document.getElementById('provinceSelect');
+
+  function renderTRCities(selected){
+    citySelect.innerHTML = '';
+    const ph = new Option('— Select city —', '', true, !selected);
+    ph.disabled = true;
+    citySelect.add(ph);
+    TR_PROVINCES.forEach(p => {
+      citySelect.add(new Option(p, p, false, (selected||'').toLowerCase()===p.toLowerCase()));
+    });
+  }
+
+  function renderTRDistricts(city, selected){
+    provSelect.innerHTML = '';
+    const list = TR_DISTRICTS[city] || [];
+    const ph = new Option(list.length ? '— Select district —' : '— Other / not listed —', '', true, true);
+    ph.disabled = true;
+    provSelect.add(ph);
+    list.forEach(d => provSelect.add(new Option(d, d, false, (selected||'').toLowerCase()===d.toLowerCase())));
+    provSelect.add(new Option('Other / not listed…', '__OTHER__'));
+  }
+
+  function useTRUI(){
+    // City select
+    citySelectWrap.style.display = '';
+    cityInputWrap.style.display = 'none';
+    renderTRCities(cityCanon.value || cityInput.value);
+
+    // Province select
+    provSelectWrap.style.display = '';
+    renderTRDistricts(citySelect.value, provCanon.value || provInput.value);
+
+    // Province text only if "Other"
+    if (provSelect.value === '__OTHER__') {
+      provInputWrap.style.display = '';
+    } else {
+      provInputWrap.style.display = 'none';
+      provInput.value = provSelect.value || '';
+    }
+  }
+
+  function useIntlUI(){
+    // City text
+    citySelectWrap.style.display = 'none';
+    cityInputWrap.style.display = '';
+
+    // Province text
+    provSelectWrap.style.display = 'none';
+    provInputWrap.style.display = '';
+  }
+
+  function refreshUI(){
+    const isTR = (country.value || '').toUpperCase() === 'TR';
+    if (isTR) useTRUI(); else useIntlUI();
+  }
+
+  // React to changes
+  country.addEventListener('change', refreshUI);
+  citySelect.addEventListener('change', () => {
+    renderTRDistricts(citySelect.value, provCanon.value || provInput.value);
+    // When city changes, if we were using select, clear canon until submit
+  });
+  provSelect.addEventListener('change', () => {
+    if (provSelect.value === '__OTHER__') {
+      provInputWrap.style.display = '';
+      provInput.value = '';
+    } else {
+      provInputWrap.style.display = 'none';
+      provInput.value = provSelect.value || '';
+    }
+  });
+
+  // Submit: write canonical values so backend always receives strings
+  form.addEventListener('submit', () => {
+    const isTR = (country.value || '').toUpperCase() === 'TR';
+    cityCanon.value = isTR ? (citySelect.value || '') : (cityInput.value || '');
+    provCanon.value = isTR
+      ? (provSelect.value === '__OTHER__' ? (provInput.value || '') : (provSelect.value || ''))
+      : (provInput.value || '');
+  });
+
+  // Initial
+  refreshUI();
+})();
+</script>
 
 <%- include('../../shared/footer') %>

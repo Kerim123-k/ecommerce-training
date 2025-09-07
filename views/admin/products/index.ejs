@@ -3,27 +3,55 @@
 <h1>Products</h1>
 <p><a class="btn" href="/admin/products/new">+ New product</a></p>
 
+<!-- Quick filters (client-side only) -->
+<div class="toolbar" id="prodTools" style="margin:12px 0 8px; display:flex; gap:8px; flex-wrap:wrap;">
+  <input id="prodQ" class="input" type="search" placeholder="Search title or SKU" aria-label="Search products" style="min-width:260px;">
+  <select id="prodStatus" class="input" aria-label="Filter by status">
+    <option value="">All statuses</option>
+    <option value="active">Active</option>
+    <option value="draft">Draft</option>
+  </select>
+</div>
+
 <table class="table">
   <thead>
     <tr>
       <th>Title</th>
       <th>SKU</th>
-      <th>Price</th>
+      <th class="num">Price</th>
       <th>Status</th>
-      <th>Stock</th>
-      <th>Images</th>
+      <th class="num">Stock</th>
+      <th class="num">Images</th>
       <th></th>
     </tr>
   </thead>
   <tbody>
-    <% (products || []).forEach(p => { %>
-      <tr>
+    <% (products || []).forEach(p => {
+         const stockNumeric = (p.trackInventory === false) ? null : Number(p.stockQty || 0);
+         const isLow = (stockNumeric !== null && stockNumeric > 0 && stockNumeric <= 5);
+         const isOOS = (stockNumeric === 0);
+    %>
+      <tr
+        class="prod-row"
+        data-title="<%= (p.title || '').toLowerCase() %>"
+        data-sku="<%= (p.sku || '').toLowerCase() %>"
+        data-status="<%= (p.status || 'draft').toLowerCase() %>"
+        data-stock="<%= stockNumeric === null ? 999999 : stockNumeric %>"
+      >
         <td><strong><%= p.title %></strong></td>
         <td class="muted"><%= p.sku || '-' %></td>
-        <td>₺ <%= Number(p.price||0).toFixed(2) %></td>
+        <td class="num">₺ <%= Number(p.price||0).toFixed(2) %></td>
         <td><span class="pill"><%= p.status || 'Draft' %></span></td>
-        <td><%= p.trackInventory === false ? '∞' : (p.stockQty || 0) %></td>
-        <td><%= Array.isArray(p.images) ? p.images.length : 0 %></td>
+        <td class="num">
+          <% if (p.trackInventory === false) { %>
+            ∞
+          <% } else if (isLow) { %>
+            <span class="badge badge--warn"><%= stockNumeric %></span>
+          <% } else { %>
+            <%= stockNumeric %>
+          <% } %>
+        </td>
+        <td class="num"><%= Array.isArray(p.images) ? p.images.length : 0 %></td>
         <td style="white-space:nowrap;">
           <a class="btn" href="/admin/products/<%= p._id %>/images">Images</a>
           <a class="btn" href="/admin/products/<%= p._id %>/edit">Edit</a>
@@ -35,5 +63,39 @@
     <% }) %>
   </tbody>
 </table>
+
+<!-- Client-side search/filter + low-stock highlighting -->
+<script>
+(function(){
+  const $  = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+  const qInput  = $('#prodQ');
+  const sSelect = $('#prodStatus');
+  const rows    = $$('.prod-row');
+
+  // initial highlight based on data-stock
+  rows.forEach(r=>{
+    const stock = parseInt(r.dataset.stock, 10);
+    r.classList.toggle('row-oos', stock === 0);
+    r.classList.toggle('row-low', stock > 0 && stock <= 5);
+  });
+
+  function apply(){
+    const q  = (qInput?.value || '').toLowerCase().trim();
+    const st = (sSelect?.value || '').toLowerCase().trim();
+    rows.forEach(r=>{
+      const title  = r.dataset.title || '';
+      const sku    = r.dataset.sku || '';
+      const status = r.dataset.status || '';
+      const matchQ  = !q  || title.includes(q) || sku.includes(q);
+      const matchSt = !st || status === st;
+      r.style.display = (matchQ && matchSt) ? '' : 'none';
+    });
+  }
+  qInput && qInput.addEventListener('input', apply);
+  sSelect && sSelect.addEventListener('change', apply);
+  apply();
+})();
+</script>
 
 <%- include('../../shared/footer') %>

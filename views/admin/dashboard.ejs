@@ -1,26 +1,96 @@
 <%- include('../shared/header') %>
 <h1>Admin · Dashboard</h1>
 
+<%
+  /* Helpers for nice formatting */
+  function L(n){ try { return Number(n||0).toLocaleString('tr-TR',{style:'currency',currency:'TRY',minimumFractionDigits:2}); } catch(e){ return '₺ ' + Number(n||0).toFixed(2); } }
+  function N(n){ try { return Number(n||0).toLocaleString('tr-TR'); } catch(e){ return Number(n||0).toFixed(0); } }
+
+  /* Optional arrays for sparklines; safe if not provided */
+  const orders7d  = (typeof last7DaysOrders  !== 'undefined') ? last7DaysOrders  : [];
+  const revenue7d = (typeof last7DaysRevenue !== 'undefined') ? last7DaysRevenue : [];
+
+  const aov = (todayOrders && todayRevenue != null) ? (todayRevenue / todayOrders) : null;
+
+  /* Tiny SVG sparkline path */
+  function sparkPath(arr, w, h, pad) {
+    if (!Array.isArray(arr) || arr.length === 0) return '';
+    const min = Math.min(...arr), max = Math.max(...arr);
+    const dx = (w - pad*2) / ((arr.length - 1) || 1);
+    const yScale = (v) => {
+      if (max === min) return h / 2;
+      const t = (v - min) / (max - min);
+      return h - pad - t * (h - pad*2);
+    };
+    let d = '';
+    for (let i = 0; i < arr.length; i++) {
+      const x = pad + i * dx;
+      const y = yScale(arr[i]);
+      d += (i === 0 ? `M${x},${y}` : ` L${x},${y}`);
+    }
+    return d;
+  }
+%>
+
+<!-- Quick actions -->
+<div class="quick-actions">
+  <a class="btn btn--brand"     href="/admin/products/new">+ New Product</a>
+  <a class="btn btn--secondary" href="/admin/orders">View Orders</a>
+  <a class="btn btn--secondary" href="/admin/coupons">Manage Coupons</a>
+  <a class="btn btn--ghost"     href="/admin/categories">Categories</a>
+</div>
+
+<!-- KPI cards -->
 <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin-bottom:20px;">
-  <div class="card pad">
+  <div class="card pad kpi-card">
     <div class="muted">Orders Today</div>
-    <div style="font-size:28px; font-weight:700;"><%= todayOrders %></div>
+    <div class="kpi-value"><%= N(todayOrders || 0) %></div>
+    <% if (orders7d.length) { %>
+      <div class="kpi-trend">
+        <svg viewBox="0 0 120 28" width="120" height="28" aria-hidden="true">
+          <path d="<%= sparkPath(orders7d,120,28,2) %>" fill="none" stroke="currentColor" stroke-width="2" opacity=".6" />
+        </svg>
+        <span class="muted">7-day trend</span>
+      </div>
+    <% } %>
   </div>
-  <div class="card pad">
+
+  <div class="card pad kpi-card">
     <div class="muted">Revenue Today</div>
-    <div style="font-size:28px; font-weight:700;">₺ <%= Number(todayRevenue).toFixed(2) %></div>
+    <div class="kpi-value"><%= L(todayRevenue || 0) %></div>
+    <% if (revenue7d.length) { %>
+      <div class="kpi-trend">
+        <svg viewBox="0 0 120 28" width="120" height="28" aria-hidden="true">
+          <path d="<%= sparkPath(revenue7d,120,28,2) %>" fill="none" stroke="currentColor" stroke-width="2" opacity=".6" />
+        </svg>
+        <span class="muted">7-day trend</span>
+      </div>
+    <% } %>
   </div>
-  <div class="card pad">
-    <div class="muted">Status Counts</div>
-    <ul style="margin:8px 0 0 0; padding-left:16px;">
-      <% Object.keys(statusCounts).sort().forEach(s => { %>
-        <li><strong><%= s %></strong>: <%= statusCounts[s] %></li>
-      <% }) %>
-    </ul>
+
+  <div class="card pad kpi-card">
+    <div class="muted">Avg Order Value</div>
+    <div class="kpi-value"><%= (aov==null ? '—' : L(aov)) %></div>
+    <div class="kpi-sub muted">Revenue ÷ Orders</div>
   </div>
 </div>
 
+<!-- Status counts with clickable badges -->
+<div class="card pad">
+  <div class="muted">Status Counts</div>
+  <ul class="status-list">
+    <% Object.keys(statusCounts).sort().forEach(s => { %>
+      <li>
+        <a class="badge <%= 'badge--status-' + String(s).toLowerCase() %>"
+           href="/admin/orders?status=<%= encodeURIComponent(s) %>"><%= s %></a>
+        <strong><%= N(statusCounts[s]) %></strong>
+      </li>
+    <% }) %>
+  </ul>
+</div>
+
 <div class="grid" style="grid-template-columns: 1fr 1fr; gap:16px;">
+  <!-- Low stock -->
   <div class="card pad">
     <h3 style="margin-top:0;">Low Stock (≤5)</h3>
     <% if (!lowStock || !lowStock.length) { %>
@@ -28,13 +98,16 @@
     <% } else { %>
       <div style="overflow:auto;">
         <table class="table">
-          <thead><tr><th>SKU</th><th>Title</th><th>Stock</th></tr></thead>
+          <thead><tr><th>SKU</th><th>Title</th><th class="num">Stock</th><th></th></tr></thead>
           <tbody>
             <% lowStock.forEach(p => { %>
               <tr>
                 <td><%= p.sku %></td>
                 <td><%= p.title %></td>
-                <td><%= p.stockQty %></td>
+                <td class="num"><span class="badge badge--warn"><%= N(p.stockQty) %></span></td>
+                <td style="text-align:right">
+                  <% if (p._id) { %><a class="btn btn--secondary" href="/admin/products/<%= p._id %>/edit">Edit</a><% } %>
+                </td>
               </tr>
             <% }) %>
           </tbody>
@@ -43,6 +116,7 @@
     <% } %>
   </div>
 
+  <!-- Top products (last 7 days) -->
   <div class="card pad">
     <h3 style="margin-top:0;">Top Products (last 7 days)</h3>
     <% if (!topProducts || !topProducts.length) { %>
@@ -50,14 +124,16 @@
     <% } else { %>
       <div style="overflow:auto;">
         <table class="table">
-          <thead><tr><th>SKU</th><th>Title</th><th>Qty</th><th>Revenue</th></tr></thead>
+          <thead>
+            <tr><th>SKU</th><th>Title</th><th class="num">Qty</th><th class="num">Revenue</th></tr>
+          </thead>
           <tbody>
             <% topProducts.forEach(t => { %>
               <tr>
                 <td><%= t._id?.sku || '-' %></td>
                 <td><%= t._id?.title || '-' %></td>
-                <td><%= t.qty %></td>
-                <td>₺ <%= Number(t.revenue || 0).toFixed(2) %></td>
+                <td class="num"><%= N(t.qty) %></td>
+                <td class="num"><%= L(t.revenue || 0) %></td>
               </tr>
             <% }) %>
           </tbody>

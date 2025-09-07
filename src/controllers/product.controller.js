@@ -60,27 +60,45 @@ exports.adminIndex = async (_req, res, next) => {
 };
 
 // GET /admin/products/new
-exports.adminNewForm = (_req, res) => {
-  res.render('admin/products/new', { values: {}, error: null });
+exports.adminNewForm = async (_req, res, next) => {
+  try {
+    // Load categories for the dropdown (use the field your model has: name/title)
+    const categories = await Category.find({ /* status: 'Active' */ })
+      .select('name title slug')   // keep it light
+      .sort({ name: 1, title: 1 })
+      .lean();
+
+    res.render('admin/products/new', {
+      values: {},
+      error: null,
+      categories        // <-- important
+    });
+  } catch (e) { next(e); }
 };
+
 
 // POST /admin/products
 exports.adminCreate = async (req, res, next) => {
   try {
     const v = req.body || {};
 
-    // optional single primary image upload
+    // ---- primary image (unchanged) ----
     let primary = '';
-    if (req.file && req.file.path) {
+    if (req.file?.path) {
       const rel = relFromPublic(req.file.path);
       if (rel) primary = rel;
     }
-    // optional URL field named "image"
     const urlImage = (v.image || '').trim();
-
     const images = [];
     if (primary) images.push(primary);
     if (urlImage) images.push(urlImage);
+
+    // ---- category handling ----
+    // accept either `categoryId` (from <select>) or `category` (hidden mirror)
+    const catRaw = v.categoryId || v.category || null;
+    const categories = toArray(catRaw)
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
 
     const doc = await Product.create({
       title: v.title || '',
@@ -92,22 +110,34 @@ exports.adminCreate = async (req, res, next) => {
       description: v.description || '',
       image: images[0] || '',
       images,
-      // IMPORTANT: keep slug in sync so /p/:slug works
+      categories, // <-- save the association
       slug: slugify(v.title || '', { lower: true, strict: true })
     });
 
     res.redirect('/admin/products');
   } catch (e) {
-    res.status(400).render('admin/products/new', { values: req.body, error: e.message });
+    try {
+      // re-render with the same list on validation errors
+      const categories = await Category.find({})
+        .select('name title slug').sort({ name: 1, title: 1 }).lean();
+      res.status(400).render('admin/products/new', {
+        values: req.body,
+        error: e.message,
+        categories
+      });
+    } catch (loadErr) { next(e); }
   }
 };
 
 // GET /admin/products/:id/edit
 exports.adminEditForm = async (req, res, next) => {
   try {
-    const p = await Product.findById(req.params.id).lean();
+    const [p, categories] = await Promise.all([
+      Product.findById(req.params.id).lean(),
+      Category.find({}).select('name title slug').sort({ name: 1, title: 1 }).lean()
+    ]);
     if (!p) return res.status(404).send('Not found');
-    res.render('admin/products/edit', { p, error: null });
+    res.render('admin/products/edit', { p, categories, error: null });
   } catch (e) { next(e); }
 };
 
@@ -118,25 +148,30 @@ exports.adminUpdate = async (req, res, next) => {
     if (!p) return res.status(404).send('Not found');
 
     const v = req.body || {};
-    p.title = v.title || p.title;
-    p.sku = (v.sku || p.sku || '').trim();
-    p.price = Number(v.price || p.price || 0);
-    p.status = v.status || p.status || 'Draft';
+    p.title          = v.title || p.title;
+    p.sku            = (v.sku || p.sku || '').trim();
+    p.price          = Number(v.price || p.price || 0);
+    p.status         = v.status || p.status || 'Draft';
     p.trackInventory = !!v.trackInventory;
-    p.stockQty = Number(v.stockQty || p.stockQty || 0);
-    p.description = v.description || p.description || '';
+    p.stockQty       = Number(v.stockQty || p.stockQty || 0);
+    p.description    = v.description || p.description || '';
+    p.slug           = require('slugify')(p.title || '', { lower: true, strict: true });
 
-    // keep slug in sync with title
-    p.slug = slugify(p.title || '', { lower: true, strict: true });
+    // category (single-select → array on the doc)
+    const catRaw = v.categoryId || v.category || '';
+    if (catRaw && require('mongoose').Types.ObjectId.isValid(catRaw)) {
+      p.categories = [ new (require('mongoose').Types.ObjectId)(catRaw) ];
+    } else {
+      p.categories = [];
+    }
 
-    // optional new primary image via upload
-    if (req.file && req.file.path) {
+    // optional new primary image
+    if (req.file?.path) {
       const rel = relFromPublic(req.file.path);
       if (rel) {
         p.image = rel;
         p.images = ensureImagesArray(p);
         if (!p.images.includes(rel)) p.images.unshift(rel);
-        // re-ensure primary at [0]
         p.images = [rel, ...p.images.filter(u => u !== rel)];
       }
     }
@@ -144,8 +179,11 @@ exports.adminUpdate = async (req, res, next) => {
     await p.save();
     res.redirect('/admin/products');
   } catch (e) {
-    const p = await Product.findById(req.params.id).lean();
-    res.status(400).render('admin/products/edit', { p, error: e.message });
+    const [p, categories] = await Promise.all([
+      Product.findById(req.params.id).lean(),
+      Category.find({}).select('name title slug').sort({ name: 1, title: 1 }).lean()
+    ]);
+    res.status(400).render('admin/products/edit', { p, categories, error: e.message });
   }
 };
 

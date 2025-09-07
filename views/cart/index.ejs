@@ -17,7 +17,7 @@
 <% } else { %>
 
   <!-- Update all quantities in one form -->
-  <form method="POST" action="/cart/update">
+  <form id="cartForm" method="POST" action="/cart/update">
     <table class="table" style="width:100%; border-collapse:collapse;">
       <thead>
         <tr>
@@ -33,12 +33,26 @@
            const unit = Number(it.unitPrice || 0);
            const qty  = Number(it.qty || 0);
            const line = unit * qty;
+
            let thumb = it.image || '';
            if (thumb && thumb.startsWith('//')) thumb = 'https:' + thumb;
            if (thumb && thumb.startsWith('http://')) thumb = thumb.replace(/^http:\/\//,'https://');
+
            const href = it.href || (it.slug ? '/p/' + it.slug : '/products/id/' + it.productId);
+
+           // --- Low-stock calculation (uses whichever field exists) ---
+           const stockRaw =
+             (it.stockQty !== undefined ? it.stockQty
+              : it.stock !== undefined ? it.stock
+              : it.availableQty !== undefined ? it.availableQty
+              : it.remaining !== undefined ? it.remaining
+              : null);
+           const stockNum = (stockRaw === null ? null : Number(stockRaw));
+           const remain = (stockNum === null || Number.isNaN(stockNum))
+             ? null
+             : Math.max(0, stockNum - qty); // show what's left after current qty
       %>
-        <tr style="border-top:1px solid #eee;">
+        <tr style="border-top:1px solid #eee;" class="cart-row" data-product-id="<%= it.productId %>">
           <td style="padding:10px;">
             <div style="display:flex; align-items:center; gap:12px;">
               <% if (thumb) { %>
@@ -47,49 +61,64 @@
               <div>
                 <div><a href="<%= href %>"><%= it.title %></a></div>
                 <div class="muted">SKU <%= it.sku %></div>
+
+                <% if (remain !== null && remain <= 5) { %>
+                  <div class="low-stock">
+                    <span class="badge badge--warn">
+                      Only <%= remain %> left
+                    </span>
+                  </div>
+                <% } %>
               </div>
             </div>
           </td>
 
-          <td style="padding:10px;">₺ <%= unit.toFixed(2) %></td>
+          <!-- numeric classes for clean lining -->
+          <td class="price" style="padding:10px;">₺ <%= unit.toFixed(2) %></td>
 
           <td style="padding:10px;">
-            <!-- name shape that controller.update expects -->
+            <!-- names your controller expects -->
             <input type="hidden" name="items[<%= i %>][id]"  value="<%= it.productId %>">
-            <input type="number"
-                   name="items[<%= i %>][qty]"
-                   min="0"
-                   value="<%= qty %>"
-                   style="width:70px;">
+
+            <!-- stepper (no auto-submit; user still presses Update cart) -->
+            <div class="qty">
+              <button type="button" class="qty-dec" aria-label="Decrease">−</button>
+              <input class="qty-input"
+                     type="number"
+                     name="items[<%= i %>][qty]"
+                     min="0"
+                     value="<%= qty %>"
+                     style="width:70px; text-align:center;">
+              <button type="button" class="qty-inc" aria-label="Increase">+</button>
+            </div>
           </td>
 
-          <td style="padding:10px;">₺ <%= line.toFixed(2) %></td>
+          <td class="total" style="padding:10px;">₺ <span data-line-total><%= line.toFixed(2) %></span></td>
 
           <td style="padding:10px;">
-            <!-- This submits the whole form, but also includes only this button's name/value -->
-  <button class="btn"
-          type="submit"
-          name="removeId"
-          value="<%= it.productId %>"
-          formnovalidate>
-    Remove
-  </button>
-            </form>
+            <!-- submits whole form with this button's name/value -->
+            <button class="btn btn--danger-outline"
+                    type="submit"
+                    name="removeId"
+                    value="<%= it.productId %>"
+                    formnovalidate>
+              Remove
+            </button>
           </td>
         </tr>
       <% }) %>
       </tbody>
     </table>
 
-    <div style="margin-top:14px; display:flex; gap:12px;">
-      <button class="btn" type="submit">Update cart</button>
-      <a class="btn" href="/products">Continue shopping</a>
+    <div style="margin-top:14px; display:flex; gap:12px;" class="btn-group">
+      <button class="btn btn--secondary" type="submit">Update cart</button>
+      <a class="btn btn--ghost" href="/products">Continue shopping</a>
     </div>
   </form>
 
   <div style="margin-top:24px;">
     <form method="POST" action="/cart/clear">
-      <button class="btn" type="submit">Clear cart</button>
+      <button class="btn btn--danger-outline" type="submit">Clear cart</button>
     </form>
   </div>
 
@@ -102,5 +131,47 @@
   </div>
 
 <% } %>
+
+<!-- UX script: steppers + enable Update after change -->
+<script>
+(function () {
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const fmt = n => Number(n||0).toFixed(2);
+
+  // Stepper + live line-total (cosmetic)
+  $$(".cart-row").forEach((row) => {
+    const dec = row.querySelector(".qty-dec");
+    const inc = row.querySelector(".qty-inc");
+    const input = row.querySelector(".qty-input");
+    const lineEl = row.querySelector("[data-line-total]");
+    const priceCell = row.querySelector("td.price");
+    const unit = parseFloat((priceCell?.textContent || "").replace(/[^\d.]/g,'')) || 0;
+
+    const clamp = v => Math.max(0, v|0);
+    const setVal = v => {
+      input.value = clamp(v);
+      if (lineEl) lineEl.textContent = fmt(unit * Number(input.value || 0));
+      markDirty();
+    };
+
+    inc && inc.addEventListener("click", () => setVal(Number(input.value || 0) + 1));
+    dec && dec.addEventListener("click", () => setVal(Number(input.value || 0) - 1));
+    input && input.addEventListener("input", () => setVal(input.value));
+  });
+
+  // Enable "Update cart" only after a change
+  const form = document.getElementById('cartForm');
+  if (!form) return;
+  const updateBtn = form.querySelector('button[type="submit"]:not([name])'); // the Update cart button
+  if (!updateBtn) return;
+
+  function disable(){ updateBtn.disabled = true; }
+  function enable(){ updateBtn.disabled = false; }
+  function markDirty(){ enable(); }
+
+  disable(); // start disabled; user enables by changing qty
+  form.addEventListener('submit', () => disable());
+})();
+</script>
 
 <%- include('../shared/footer') %>

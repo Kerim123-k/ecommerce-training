@@ -1,20 +1,45 @@
-<%- include('../shared/header') %>
-<h1>Edit Category</h1>
+<%- include('../shared/header', { title: 'Admin • Edit category' }) %>
 
-<form method="POST" action="/admin/categories/<%= cat._id %>/edit" class="form">
-  <label>Name* <input name="name" value="<%= cat.name %>" required></label>
-  <label>Status
-    <select name="status">
-      <option <%= cat.status==='Active'?'selected':'' %>>Active</option>
-      <option <%= cat.status==='Hidden'?'selected':'' %>>Hidden</option>
-    </select>
-  </label>
-  <label>Description <input name="description" value="<%= cat.description || '' %>"></label>
-  <button type="submit">Save changes</button>
+<h1>Edit: <%= cat && cat.name ? cat.name : 'Category' %></h1>
+
+<form method="POST" action="/admin/categories/<%= cat._id %>/edit" class="vstack" style="gap:12px; max-width:720px;">
+  <section class="card pad page-card">
+    <div class="section-title">Details</div>
+
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label for="name">Name*</label>
+        <input id="name" name="name" value="<%= cat.name %>" required>
+      </div>
+
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="Active" <%= cat.status==='Active' ? 'selected':'' %>>Active</option>
+          <option value="Hidden" <%= cat.status==='Hidden' ? 'selected':'' %>>Hidden</option>
+        </select>
+      </div>
+
+      <div class="field field--full">
+        <label for="description">Description</label>
+        <input id="description" name="description" value="<%= cat.description || '' %>">
+      </div>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <div class="action-bar__inner">
+      <button class="btn btn--brand" type="submit">Save changes</button>
+      <a class="btn" href="/admin/categories">Back</a>
+    </div>
+  </div>
 </form>
 
-<form method="POST" action="/admin/categories/<%= cat._id %>/delete" onsubmit="return confirm('Delete this category?')">
-  <button type="submit">Delete</button>
+<form method="POST"
+      action="/admin/categories/<%= cat._id %>/delete"
+      onsubmit="return confirm('Delete this category? Products will simply lose this assignment.');"
+      style="margin-top:10px;">
+  <button class="btn btn--danger" type="submit">Delete</button>
 </form>
 
 <%- include('../shared/footer') %>

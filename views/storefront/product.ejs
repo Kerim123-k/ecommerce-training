@@ -1,16 +1,59 @@
 <%- include('../shared/header') %>
 
 <% const p = product; %>
+<%
+// Determine wished state from either `isWished` (boolean) or `wishIds` (array of ids).
+const wished =
+  (typeof isWished !== 'undefined')
+    ? !!isWished
+    : ((wishIds || []).map(String).includes(String(p._id)));
+%>
+
+<!-- Minimal, isolated styles for the heart -->
+<style>
+  .wish-wrap { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .wish-btn {
+    width:44px; height:44px; border-radius:999px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:#fff; border:1px solid #e5e7eb; cursor:pointer;
+    transition:transform .06s ease, border-color .15s ease;
+  }
+  .wish-btn svg { width:22px; height:22px; fill:transparent; stroke:#e11d48; stroke-width:2.2; }
+  .wish-btn.active svg { fill:#ef4444; stroke:#ef4444; }
+  .wish-btn:active { transform:scale(.96); }
+  @media (hover:hover){ .wish-btn:hover { border-color:#ef4444; } }
+</style>
+
 <article class="product-page">
   <div class="product-media">
-    <img src="<%= (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product' %>" alt="<%= p.title %>">
+    <img
+      src="<%= (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product' %>"
+      alt="<%= p.title %>">
   </div>
 
   <div class="product-info">
     <h1><%= p.title %></h1>
     <div class="muted">SKU <%= p.sku %></div>
-    <div class="price" style="font-size:1.5rem; font-weight:700; margin:8px 0;">
-      ₺ <%= Number(p.price || 0).toFixed(2) %>
+
+    <!-- Price + Heart -->
+    <div class="wish-wrap">
+      <div class="price" style="font-size:1.5rem; font-weight:700;">
+        ₺ <%= Number(p.price || 0).toFixed(2) %>
+      </div>
+
+      <!-- Toggle wishlist -->
+      <form class="wish-form" method="POST" action="/wishlist/toggle/<%= p._id %>">
+        <button
+          type="submit"
+          class="wish-btn <%= wished ? 'active' : '' %>"
+          aria-pressed="<%= wished ? 'true' : 'false' %>"
+          aria-label="<%= wished ? 'Remove from wishlist' : 'Add to wishlist' %>">
+          <!-- heart icon -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21s-7.2-4.4-9.6-8.4C.9 9.3 2.1 6.2 5 5c1.8-.8 3.9-.3 5.2 1 1.4-1.3 3.4-1.8 5.2-1 2.9 1.2 4.1 4.3 2.6 7.6C19.2 16.6 12 21 12 21z"/>
+          </svg>
+        </button>
+      </form>
     </div>
 
     <% const inStock = Number(p.stockQty || 0) > 0; %>
@@ -37,5 +80,17 @@
     <% } %>
   </div>
 </article>
+
+<script>
+  // Make the heart feel instant; server still handles the real toggle/redirect.
+  document.querySelectorAll('.wish-form').forEach(function (f) {
+    f.addEventListener('submit', function () {
+      var btn = f.querySelector('.wish-btn');
+      btn.classList.toggle('active');
+      btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
+      // let the form submit normally (server updates wishlist & redirects back)
+    });
+  });
+</script>
 
 <%- include('../shared/footer') %>

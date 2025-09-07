@@ -6,30 +6,200 @@
   <div class="alert alert-error"><%= error %></div>
 <% } %>
 
-<form method="POST" action="/admin/products" enctype="multipart/form-data" class="vstack" style="gap:10px; max-width:700px;">
-  <label>Title <input name="title" value="<%= values.title || '' %>" required></label>
-  <label>SKU <input name="sku" value="<%= values.sku || '' %>"></label>
-  <label>Price <input type="number" step="0.01" name="price" value="<%= values.price || 0 %>" required></label>
-  <label>Status
-    <select name="status">
-      <option value="Draft">Draft</option>
-      <option value="Active">Active</option>
-      <option value="Archived">Archived</option>
-    </select>
-  </label>
-  <label><input type="checkbox" name="trackInventory" checked> Track inventory</label>
-  <label>Stock qty <input type="number" name="stockQty" value="<%= values.stockQty || 0 %>"></label>
-  <label>Description
-    <textarea name="description" rows="4"><%= values.description || '' %></textarea>
-  </label>
+<form id="productForm" method="POST" action="/admin/products" enctype="multipart/form-data">
 
-  <fieldset style="border:1px solid #eee; padding:10px;">
-    <legend>Primary image (optional)</legend>
-    <input type="file" name="imageFile" accept="image/*">
-  </fieldset>
+  <!-- BASIC INFO -->
+  <section class="card pad page-card">
+    <div class="section-title">Basic info</div>
 
-  <button class="btn btn--brand" type="submit">Create</button>
-  <a class="btn" href="/admin/products">Cancel</a>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label for="title">Title</label>
+        <input id="title" name="title" value="<%= (values && values.title) || '' %>" required>
+      </div>
+
+      <div class="field">
+        <label for="sku" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <span>SKU</span>
+          <button id="genSku" class="btn btn--ghost" type="button" title="Generate from title">Generate</button>
+        </label>
+        <input id="sku" name="sku" value="<%= (values && values.sku) || '' %>">
+        <div class="help">Optional internal code</div>
+      </div>
+
+      <div class="field field--full">
+        <label for="price">Price</label>
+        <div class="input-prefix">
+          <span>₺</span>
+          <input id="price" type="number" step="0.01" min="0" name="price" value="<%= (values && values.price) || 0 %>" required>
+        </div>
+        <div class="help">Preview: <strong id="priceOut">₺ 0,00</strong></div>
+      </div>
+
+      <div class="field field--full">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="4"><%= (values && values.description) || '' %></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVENTORY & STATUS -->
+  <section class="card pad page-card">
+    <div class="section-title">Inventory & status</div>
+
+    <div class="form-grid cols-2">
+      <!-- Row 1 -->
+      <div class="field field--labelonly">
+        <label id="statusLabel" for="status">Status</label>
+      </div>
+      <div class="field">
+        <div class="switch-wrap">
+          <input id="trackInventory" class="switch-input" type="checkbox" name="trackInventory"
+                 <%= (values && values.trackInventory === false) ? '' : 'checked' %>>
+          <label for="trackInventory" class="switch-ui" aria-hidden="true"></label>
+          <label for="trackInventory" class="switch-text">Track inventory</label>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="field">
+        <select id="status" name="status" aria-labelledby="statusLabel">
+          <option value="Draft"    <%= (values && values.status === 'Draft')    ? 'selected' : '' %>>Draft</option>
+          <option value="Active"   <%= (values && values.status === 'Active')   ? 'selected' : '' %>>Active</option>
+          <option value="Archived" <%= (values && values.status === 'Archived') ? 'selected' : '' %>>Archived</option>
+        </select>
+      </div>
+
+      <div class="field" id="stockWrap">
+        <label for="stockQty">Stock qty</label>
+        <input id="stockQty" type="number" name="stockQty" min="0" value="<%= (values && values.stockQty) || 0 %>">
+        <div class="help">If tracking is off, stock is treated as ∞</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORY -->
+  <section class="card pad page-card">
+    <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Category</span>
+      <a class="btn btn--ghost" href="/admin/categories">Manage categories</a>
+    </div>
+
+    <% 
+      const _cats = Array.isArray(categories) ? categories : [];
+      const _hasCats = _cats.length > 0;
+      const selectedCat = (values && (values.categoryId || values.category)) || '';
+    %>
+
+    <% if (!_hasCats) { %>
+      <div class="alert alert-warning">
+        No categories yet. <a href="/admin/categories">Create one in Categories</a>.
+      </div>
+    <% } else { %>
+      <div class="field" style="max-width:520px;">
+        <label for="categoryId" class="sr-only">Category</label>
+        <select id="categoryId" name="categoryId">
+          <option value="">— Select a category —</option>
+          <% _cats.forEach(function(cat){ 
+               const id = String(cat._id);
+               const label = cat.name || cat.title || ('Category ' + id.slice(-4));
+          %>
+            <option value="<%= id %>" <%= String(selectedCat) === id ? 'selected' : '' %>>
+              <%= label %>
+            </option>
+          <% }) %>
+        </select>
+        <!-- mirror for compatibility if server expects "category" -->
+        <input type="hidden" name="category" id="categoryMirror" value="<%= selectedCat %>">
+        <div class="help">Used for storefront filtering.</div>
+      </div>
+    <% } %>
+  </section>
+
+  <!-- PRIMARY IMAGE -->
+  <section class="card pad page-card">
+    <div class="section-title">Primary image (optional)</div>
+    <div class="field">
+      <input id="imageFile" type="file" name="imageFile" accept="image/*">
+      <div id="imgPreview" class="img-preview" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- STICKY ACTIONS -->
+  <div class="action-bar">
+    <div class="action-bar__inner">
+      <button class="btn btn--brand" type="submit">Create</button>
+      <a class="btn" href="/admin/products">Cancel</a>
+    </div>
+  </div>
 </form>
+
+<script>
+(function () {
+  const $ = (s, r=document)=>r.querySelector(s);
+
+  const price     = $('#price');
+  const priceOut  = $('#priceOut');
+  const track     = $('#trackInventory');
+  const stock     = $('#stockQty');
+  const stockWrap = $('#stockWrap');
+  const title     = $('#title');
+  const sku       = $('#sku');
+  const genSku    = $('#genSku');
+  const fileIn    = $('#imageFile');
+  const imgPrev   = $('#imgPreview');
+
+  const catSel    = $('#categoryId');
+  const catMirror = $('#categoryMirror');
+
+  const fmt = new Intl.NumberFormat('tr-TR', { style:'currency', currency:'TRY', minimumFractionDigits:2 });
+
+  function refreshPrice(){
+    const v = parseFloat(price.value || 0);
+    priceOut.textContent = fmt.format(isNaN(v) ? 0 : v);
+  }
+  function refreshInventory(){
+    const on = !!(track && track.checked);
+    if (stock) {
+      stock.disabled = !on;
+      stock.placeholder = on ? '' : '∞';
+    }
+    if (stockWrap) stockWrap.style.opacity = on ? '1' : '.6';
+  }
+
+  function cleanSlug(s){
+    return (s || '')
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-zA-Z0-9]+/g,'')
+      .toUpperCase();
+  }
+  genSku && genSku.addEventListener('click', function(){
+    const base = cleanSlug(title && title.value ? title.value : 'SKU').slice(0,10);
+    const rand = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+    if (sku) { sku.value = base + (rand ? '-' + rand : ''); sku.focus(); }
+  });
+
+  price && price.addEventListener('input', refreshPrice);
+  track && track.addEventListener('change', refreshInventory);
+
+  // image preview
+  fileIn && fileIn.addEventListener('change', function(){
+    if (!this.files || !this.files[0]) { imgPrev.innerHTML=''; imgPrev.setAttribute('aria-hidden','true'); return; }
+    const f = this.files[0];
+    const url = URL.createObjectURL(f);
+    imgPrev.innerHTML = '<img alt="Preview" src="'+url+'">';
+    imgPrev.setAttribute('aria-hidden','false');
+  });
+
+  // keep hidden mirror in sync
+  catSel && catSel.addEventListener('change', () => {
+    if (catMirror) catMirror.value = catSel.value || '';
+  });
+
+  // initial
+  refreshPrice();
+  refreshInventory();
+})();
+</script>
 
 <%- include('../../shared/footer') %>
