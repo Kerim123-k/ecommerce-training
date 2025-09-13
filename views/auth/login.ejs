@@ -1,13 +1,59 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Sign In' }) %>
+
 <h1>Sign In</h1>
-<% if (errors && errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
-<form method="POST" action="/auth/login" class="form">
-  <label>Email* <input type="email" name="email" value="<%= (values&&values.email)||'' %>" required></label>
-  <label>Password* <input type="password" name="password" required></label>
-  <button type="submit">Login</button>
-  <p><a href="/auth/forgot">Forgot your password?</a></p>
-  
 
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="alert"><%= flash %></div>
+<% } %>
+<% if (errors && errors.length) { %>
+  <div class="alert alert-warning">
+    <ul style="margin-left:16px;">
+      <% errors.forEach(e => { %><li><%= e.msg || e %></li><% }) %>
+    </ul>
+  </div>
+<% } %>
 
-</form>
+<section class="card pad page-card" style="max-width:760px;">
+  <form method="POST" action="/auth/login" class="form-grid cols-2" novalidate>
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="email">Email*</label>
+      <input id="email" name="email" type="email" required
+             value="<%= (values && values.email) || '' %>"
+             placeholder="you@example.com">
+    </div>
+
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="password">Password*</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="password" name="password" type="password" required
+               placeholder="Your password" style="flex:1;">
+        <button class="btn" type="button" id="togglePwd">Show</button>
+      </div>
+      <div class="muted" style="margin-top:6px;">
+        <a href="/auth/forgot">Forgot your password?</a>
+      </div>
+    </div>
+
+    <div class="field" style="grid-column:1 / -1; display:flex; gap:8px;">
+      <button class="btn btn--brand" type="submit">Login</button>
+      <a class="btn" href="/auth/register">Create account</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function () {
+    const btn = document.getElementById('togglePwd');
+    const input = document.getElementById('password');
+    if (btn && input) {
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.textContent = show ? 'Hide' : 'Show';
+        input.focus();
+      });
+    }
+  })();
+</script>
+
 <%- include('../shared/footer') %>

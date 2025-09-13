@@ -520,3 +520,8 @@ input:focus, select:focus, textarea:focus {
 .switch-ui{
   height:28px;
 }
+
+.icon-btn .heart { color: <%= (_wishCount || 0) > 0 ? '#e11d48' : '#a3a3a3' %> }
+
+
+

@@ -1,41 +1,49 @@
-<%- include('../shared/header') %>
-<h1>My Wishlist</h1>
+<%- include('../shared/header', { title: 'Wishlist' }) %>
+
+<h1>Wishlist</h1>
 
 <% const list = Array.isArray(products) ? products : []; %>
+
 <% if (!list.length) { %>
   <p class="muted">Your wishlist is empty.</p>
-  <p><a class="btn" href="/products">Browse products</a></p>
 <% } else { %>
-  <div class="grid">
+  <div class="wish-grid">
     <% list.forEach(p => {
-         let img = (Array.isArray(p.images) && p.images[0]) || p.image || '';
-         if (img && img.startsWith('//')) img = 'https:' + img;
-         if (img && img.startsWith('http://')) img = img.replace(/^http:\/\//,'https://');
-         const href = (p.slug && String(p.slug).trim()) ? '/p/' + p.slug : '/products/id/' + p._id;
+         const href = p.slug ? ('/p/' + p.slug) : ('/products/id/' + p._id);
+         const img  = (Array.isArray(p.images) && p.images[0]) || p.image || 'https://via.placeholder.com/400x300?text=No+Image';
     %>
-      <div class="card">
-        <a href="<%= href %>"><img src="<%= img %>" alt="<%= p.title %>"></a>
-        <div class="pad">
-          <h3><a href="<%= href %>"><%= p.title %></a></h3>
-          <div class="muted">SKU <%= p.sku %></div>
+      <article class="wish-card">
+        <a class="thumb" href="<%= href %>">
+          <img src="<%= img %>" alt="<%= p.title %>">
+        </a>
+        <div class="body">
+          <a class="title" href="<%= href %>"><%= p.title %></a>
           <div class="price">₺ <%= Number(p.price || 0).toFixed(2) %></div>
+          <div class="actions">
+            <form method="POST" action="/cart/add/<%= p._id %>">
+              <input type="hidden" name="qty" value="1">
+              <button class="btn btn--brand" type="submit">Add to cart</button>
+            </form>
+            <form method="POST" action="/wishlist/remove/<%= p._id %>" onsubmit="return confirm('Remove from wishlist?')">
+              <button class="btn btn--danger" type="submit">Remove</button>
+            </form>
+          </div>
         </div>
-        <div class="actions">
-          <form method="POST" action="/cart/add/<%= p._id %>" style="display:inline;">
-            <input type="hidden" name="qty" value="1">
-            <button class="btn btn--brand" type="submit">Add to cart</button>
-          </form>
-          <form method="POST" action="/wishlist/remove/<%= p._id %>" style="display:inline;">
-            <button class="btn" type="submit">Remove</button>
-          </form>
-        </div>
-      </div>
+      </article>
     <% }) %>
   </div>
-
-  <form method="POST" action="/wishlist/clear" style="margin-top:16px;">
-    <button class="btn" type="submit">Clear all</button>
-  </form>
 <% } %>
+
+<style>
+  .wish-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .wish-card{border:1px solid #e6e6e6;border-radius:12px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+  .wish-card .thumb{display:block}
+  .wish-card .thumb img{display:block;width:100%;height:160px;object-fit:cover} /* smaller, consistent thumbs */
+  .wish-card .body{padding:10px;display:flex;flex-direction:column;gap:6px}
+  .wish-card .title{font-weight:600;line-height:1.2}
+  .wish-card .price{font-weight:700}
+  .wish-card .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn.btn--danger{background:#e02424;color:#fff;border-color:#e02424}
+</style>
 
 <%- include('../shared/footer') %>

@@ -40,6 +40,17 @@ app.use(session({
   store,
 }));
 
+// after app.use(session(...))
+app.use((req, res, next) => {
+  const list = Array.isArray(req.session.wishlist) ? req.session.wishlist : [];
+  const ids  = list.filter(Boolean).map(String);
+
+  res.locals.wishIds   = ids;         // used to paint hearts red
+  res.locals.wishCount = ids.length;  // used for the header bubble
+  next();
+});
+
+
 /* ---------- Gate admin URLs ---------- */
 const requireAdmin = require('./middleware/requireAdmin');
 app.use((req, res, next) => {
@@ -48,26 +59,29 @@ app.use((req, res, next) => {
 });
 
 /* ---------- Safe locals (after session) ---------- */
+// Safe locals (after session)
 app.use((req, res, next) => {
   res.locals.currentUser = req.session?.user || null;
 
-  // Wishlist badges/toggles
-  const wl = req.session?.wishlist?.items || [];
-  res.locals.wishlistCount = wl.length;
-  res.locals.wishlistIds   = wl.map(String);
+  // --- Wishlist (session is a plain array) ---
+  const wl = Array.isArray(req.session.wishlist)
+    ? req.session.wishlist.filter(Boolean).map(String)
+    : [];
 
-  // Cart badge
-  const items = req.session?.cart?.items || [];
+  // aliases so old/new templates both work
+  res.locals.wishIds       = wl;
+  res.locals.wishlistIds   = wl;
+  res.locals.wishCount     = wl.length;
+  res.locals.wishlistCount = wl.length;
+
+  // --- Cart badge ---
+  const items = Array.isArray(req.session?.cart?.items) ? req.session.cart.items : [];
   res.locals.cartCount = items.reduce((n, it) => n + Number(it.qty || 0), 0);
 
-  // Optional banner slot
   res.locals.banner = null;
   next();
 });
-app.get('/account', (req, res) => {
-  if (!req.session?.user) return res.redirect('/auth/login');
-  res.render('account/index');
-});
+
 
 
 /* ---------- Routes ---------- */

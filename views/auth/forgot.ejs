@@ -1,17 +1,36 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Forgot Password' }) %>
+
 <h1>Forgot Password</h1>
 
 <% if (errors && errors.length) { %>
-  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+  <div class="alert alert-warning">
+    <ul style="margin-left:16px;">
+      <% errors.forEach(e => { %><li><%= e.msg || e %></li><% }) %>
+    </ul>
+  </div>
 <% } %>
 
-<% if (ok) { %>
-  <p>We’ve sent a reset link if the email exists. (In this demo, check the server console for the link.)</p>
-<% } %>
+<section class="card pad page-card" style="max-width:760px;">
+  <% if (ok) { %>
+    <p>We’ve sent a reset link if the email exists. <span class="muted">(In this demo, check the server console for the link.)</span></p>
+    <div style="margin-top:12px;">
+      <a class="btn btn--brand" href="/auth/login">Back to sign in</a>
+    </div>
+  <% } else { %>
+    <form method="POST" action="/auth/forgot" class="form-grid cols-2" novalidate>
+      <div class="field" style="grid-column:1 / -1;">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email"
+               value="<%= (values && values.email) || '' %>"
+               placeholder="you@example.com" required>
+      </div>
 
-<form method="POST" action="/auth/forgot" class="form">
-  <label>Email <input type="email" name="email" value="<%= (values && values.email) || '' %>" required></label>
-  <button type="submit">Send reset link</button>
-</form>
+      <div class="field" style="grid-column:1 / -1; display:flex; gap:8px;">
+        <button class="btn btn--brand" type="submit">Send reset link</button>
+        <a class="btn" href="/auth/login">Back to sign in</a>
+      </div>
+    </form>
+  <% } %>
+</section>
+
 <%- include('../shared/footer') %>
-

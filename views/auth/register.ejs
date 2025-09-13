@@ -1,11 +1,71 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Create Account' }) %>
+
 <h1>Create Account</h1>
-<% if (errors && errors.length) { %><div class="alert-error"><ul><% errors.forEach(e=>{ %><li><%= e.msg %></li><% }) %></ul></div><% } %>
-<form method="POST" action="/auth/register" class="form">
-  <label>Email* <input type="email" name="email" value="<%= (values&&values.email)||'' %>" required></label>
-  <label>Password* <input type="password" name="password" required></label>
-  <label>First name <input name="firstName" value="<%= (values&&values.firstName)||'' %>"></label>
-  <label>Last name <input name="lastName" value="<%= (values&&values.lastName)||'' %>"></label>
-  <button type="submit">Register</button>
-</form>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="alert"><%= flash %></div>
+<% } %>
+<% if (errors && errors.length) { %>
+  <div class="alert alert-warning">
+    <ul style="margin-left:16px;">
+      <% errors.forEach(e => { %><li><%= e.msg || e %></li><% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<section class="card pad page-card" style="max-width:900px;">
+  <form method="POST" action="/auth/register" class="form-grid cols-2" novalidate>
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="email">Email*</label>
+      <input id="email" name="email" type="email" required
+             value="<%= (values && values.email) || '' %>"
+             placeholder="you@example.com">
+    </div>
+
+    <div class="field">
+      <label for="firstName">First name</label>
+      <input id="firstName" name="firstName" type="text"
+             value="<%= (values && values.firstName) || '' %>" placeholder="Jane">
+    </div>
+
+    <div class="field">
+      <label for="lastName">Last name</label>
+      <input id="lastName" name="lastName" type="text"
+             value="<%= (values && values.lastName) || '' %>" placeholder="Doe">
+    </div>
+
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="password">Password*</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="password" name="password" type="password" required
+               placeholder="Choose a strong password" style="flex:1;">
+        <button class="btn" type="button" id="togglePwdReg">Show</button>
+      </div>
+      <div class="muted" style="margin-top:6px;">
+        Use at least 8 characters with a mix of letters and numbers.
+      </div>
+    </div>
+
+    <div class="field" style="grid-column:1 / -1; display:flex; gap:8px;">
+      <button class="btn btn--brand" type="submit">Register</button>
+      <a class="btn" href="/auth/login">Already have an account?</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function () {
+    const btn = document.getElementById('togglePwdReg');
+    const input = document.getElementById('password');
+    if (btn && input) {
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.textContent = show ? 'Hide' : 'Show';
+        input.focus();
+      });
+    }
+  })();
+</script>
+
 <%- include('../shared/footer') %>

@@ -15,6 +15,12 @@ const Review   = require('../models/Review');
 /* ------------------------------------------------------------------ */
 const toArray = v => (Array.isArray(v) ? v : (v ? [v] : []));
 
+// Read wishlist from session and expose as a Set of productId strings
+function getWishIdSet(req) {
+  const list = Array.isArray(req.session?.wishlist) ? req.session.wishlist : [];
+  // items can be either ObjectIds/strings or { productId, addedAt }
+  return new Set(list.map(x => String(x?.productId ?? x)));
+}
 
 async function buildRating(productId) {
   const [stats] = await Review.aggregate([
@@ -62,27 +68,25 @@ exports.adminIndex = async (_req, res, next) => {
 // GET /admin/products/new
 exports.adminNewForm = async (_req, res, next) => {
   try {
-    // Load categories for the dropdown (use the field your model has: name/title)
-    const categories = await Category.find({ /* status: 'Active' */ })
-      .select('name title slug')   // keep it light
+    const categories = await Category.find({})
+      .select('name title slug')
       .sort({ name: 1, title: 1 })
       .lean();
 
     res.render('admin/products/new', {
       values: {},
       error: null,
-      categories        // <-- important
+      categories
     });
   } catch (e) { next(e); }
 };
-
 
 // POST /admin/products
 exports.adminCreate = async (req, res, next) => {
   try {
     const v = req.body || {};
 
-    // ---- primary image (unchanged) ----
+    // primary image
     let primary = '';
     if (req.file?.path) {
       const rel = relFromPublic(req.file.path);
@@ -93,14 +97,13 @@ exports.adminCreate = async (req, res, next) => {
     if (primary) images.push(primary);
     if (urlImage) images.push(urlImage);
 
-    // ---- category handling ----
-    // accept either `categoryId` (from <select>) or `category` (hidden mirror)
+    // categories
     const catRaw = v.categoryId || v.category || null;
     const categories = toArray(catRaw)
       .filter(id => mongoose.Types.ObjectId.isValid(id))
       .map(id => new mongoose.Types.ObjectId(id));
 
-    const doc = await Product.create({
+    await Product.create({
       title: v.title || '',
       sku: (v.sku || '').trim(),
       price: Number(v.price || 0),
@@ -110,14 +113,13 @@ exports.adminCreate = async (req, res, next) => {
       description: v.description || '',
       image: images[0] || '',
       images,
-      categories, // <-- save the association
+      categories,
       slug: slugify(v.title || '', { lower: true, strict: true })
     });
 
     res.redirect('/admin/products');
   } catch (e) {
     try {
-      // re-render with the same list on validation errors
       const categories = await Category.find({})
         .select('name title slug').sort({ name: 1, title: 1 }).lean();
       res.status(400).render('admin/products/new', {
@@ -155,12 +157,12 @@ exports.adminUpdate = async (req, res, next) => {
     p.trackInventory = !!v.trackInventory;
     p.stockQty       = Number(v.stockQty || p.stockQty || 0);
     p.description    = v.description || p.description || '';
-    p.slug           = require('slugify')(p.title || '', { lower: true, strict: true });
+    p.slug           = slugify(p.title || '', { lower: true, strict: true });
 
-    // category (single-select → array on the doc)
+    // category (single-select → array)
     const catRaw = v.categoryId || v.category || '';
-    if (catRaw && require('mongoose').Types.ObjectId.isValid(catRaw)) {
-      p.categories = [ new (require('mongoose').Types.ObjectId)(catRaw) ];
+    if (catRaw && mongoose.Types.ObjectId.isValid(catRaw)) {
+      p.categories = [ new mongoose.Types.ObjectId(catRaw) ];
     } else {
       p.categories = [];
     }
@@ -242,9 +244,12 @@ exports.storefront = async (req, res, next) => {
       .limit(limit)
       .lean();
 
+    const wishIds = getWishIdSet(req);
+
     res.render('storefront/index', {
       products, cats, q, cat, sort,
-      page: pageNum, pages, total, currentCategory
+      page: pageNum, pages, total, currentCategory,
+      wishIds
     });
   } catch (err) { next(err); }
 };
@@ -278,9 +283,12 @@ exports.showEither = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash });
+    const wishIds = getWishIdSet(req);
+
+    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
   } catch (e) { next(e); }
 };
+
 exports.show = async (req, res, next) => {
   try {
     const product = await Product.findOne({
@@ -303,7 +311,9 @@ exports.show = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash });
+    const wishIds = getWishIdSet(req);
+
+    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
   } catch (e) { next(e); }
 };
 
@@ -322,7 +332,6 @@ exports.showById = async (req, res, next) => {
     const inStock  = qty > 0;
     const lowStock = product.trackInventory !== false && inStock && qty <= 5;
 
-    // rating summary (optional)
     const [stats] = await Review.aggregate([
       { $match: { productId: product._id, status: 'Approved' } },
       { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: '$rating' } } }
@@ -340,7 +349,9 @@ exports.showById = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash });
+    const wishIds = getWishIdSet(req);
+
+    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
   } catch (e) { next(e); }
 };
 
@@ -399,6 +410,8 @@ exports.categoryPage = async (req, res, next) => {
       ptr = parent;
     }
 
+    const wishIds = getWishIdSet(req);
+
     res.render('storefront/index', {
       products,
       cats,
@@ -409,7 +422,8 @@ exports.categoryPage = async (req, res, next) => {
       pages,
       total,
       currentCategory,
-      breadcrumbs
+      breadcrumbs,
+      wishIds
     });
   } catch (err) { next(err); }
 };

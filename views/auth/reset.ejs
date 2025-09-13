@@ -1,13 +1,46 @@
-<%- include('../shared/header') %>
+<%- include('../shared/header', { title: 'Set a New Password' }) %>
+
 <h1>Set a New Password</h1>
 
 <% if (errors && errors.length) { %>
-  <div class="alert-error"><ul><% errors.forEach(e => { %><li><%= e.msg %></li><% }) %></ul></div>
+  <div class="alert alert-warning">
+    <ul style="margin-left:16px;">
+      <% errors.forEach(e => { %><li><%= e.msg || e %></li><% }) %>
+    </ul>
+  </div>
 <% } %>
 
-<form method="POST" action="/auth/reset/<%= token %>" class="form">
-  <label>New password <input type="password" name="password" minlength="6" required></label>
-  <button type="submit">Update Password</button>
-</form>
-<%- include('../shared/footer') %>
+<section class="card pad page-card" style="max-width:760px;">
+  <form method="POST" action="/auth/reset/<%= token %>" class="form-grid cols-2" novalidate>
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="password">New password</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="password" name="password" type="password" minlength="6" required
+               placeholder="Enter a new password" style="flex:1;">
+        <button class="btn" type="button" id="togglePwdReset">Show</button>
+      </div>
+    </div>
 
+    <div class="field" style="grid-column:1 / -1; display:flex; gap:8px;">
+      <button class="btn btn--brand" type="submit">Update Password</button>
+      <a class="btn" href="/auth/login">Back to sign in</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function () {
+    const btn = document.getElementById('togglePwdReset');
+    const input = document.getElementById('password');
+    if (btn && input) {
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.textContent = show ? 'Hide' : 'Show';
+        input.focus();
+      });
+    }
+  })();
+</script>
+
+<%- include('../shared/footer') %>

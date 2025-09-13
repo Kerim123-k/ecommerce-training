@@ -1,98 +1,88 @@
 // src/controllers/wishlist.controller.js
+'use strict';
+
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 
 function getList(req) {
-  if (!req.session.wishlist) req.session.wishlist = { items: [] };
-  return req.session.wishlist.items;
+  if (!Array.isArray(req.session.wishlist)) req.session.wishlist = [];
+  return req.session.wishlist;
 }
 
-function goBack(req, fallback = '/wishlist') {
-  return req.get('Referer') || fallback;
+function redirectBack(req, res, fallback = '/wishlist') {
+  res.redirect(req.get('Referer') || fallback);
 }
 
-exports.index = async (req, res, next) => {
+// GET /wishlist
+async function index(req, res, next) {
   try {
-    const ids = getList(req).map(String);
-    if (!ids.length) return res.render('wishlist/index', { products: [] });
+    const ids = getList(req)
+      .map(String)
+      .filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (!ids.length) {
+      return res.render('wishlist/index', { products: [] });
+    }
 
     const products = await Product.find({
       _id: { $in: ids },
-      status: 'Active',
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
     }).lean();
 
-    // keep session order
+    // Keep original order
     const map = new Map(products.map(p => [String(p._id), p]));
     const ordered = ids.map(id => map.get(id)).filter(Boolean);
 
     res.render('wishlist/index', { products: ordered });
   } catch (e) { next(e); }
-};
+}
 
-exports.add = async (req, res, next) => {
-  try {
-    const p = await Product.findOne({
-      _id: req.params.id,
-      status: 'Active',
-      isDeleted: { $ne: true }
-    }).select('_id slug').lean();
-
-    if (p) {
-      const items = getList(req).map(String);
-      const id = String(p._id);
-      if (!items.includes(id)) items.push(id);
-      req.session.wishlist.items = items;
-    }
-
-    // prefer going back; fall back to wishlist
-    return res.redirect(goBack(req));
-  } catch (e) { next(e); }
-};
-
-exports.remove = (req, res) => {
+// POST /wishlist/add/:id
+function add(req, res) {
   const id = String(req.params.id || '');
-  const items = getList(req).map(String).filter(x => x !== id);
-  req.session.wishlist.items = items;
-  return res.redirect(goBack(req));
-};
-
-exports.clear = (req, res) => {
-  req.session.wishlist = { items: [] };
-  res.redirect('/wishlist');
-};
-
-// Toggle add/remove; returns JSON { ok, inWishlist, count }
-exports.toggle = (req, res) => {
-  if (!req.session.wishlist) req.session.wishlist = { items: [] };
-  const items = (req.session.wishlist.items || []).map(String);
-
-  const id = String(req.params.id || '');
-  const idx = items.indexOf(id);
-  let inWishlist;
-
-  if (idx >= 0) {
-    items.splice(idx, 1);
-    inWishlist = false;
-  } else {
-    items.push(id);
-    inWishlist = true;
+  const list = getList(req);
+  if (mongoose.Types.ObjectId.isValid(id) && !list.includes(id)) {
+    list.push(id);                  // de-duped add
   }
+  redirectBack(req, res);
+}
 
-  req.session.wishlist.items = items;
-  res.json({ ok: true, inWishlist, count: items.length });
-};
-
-exports.toggle = (req, res) => {
+// POST /wishlist/remove/:id
+function remove(req, res) {
   const id = String(req.params.id || '');
-  if (!req.session.wishlist) req.session.wishlist = { items: [] };
-  const items = (req.session.wishlist.items || []).map(String);
+  const list = getList(req);
+  req.session.wishlist = list.filter(x => String(x) !== id);
+  redirectBack(req, res);
+}
 
-  let inWishlist;
-  const i = items.indexOf(id);
-  if (i === -1) { items.push(id); inWishlist = true; }
-  else { items.splice(i, 1); inWishlist = false; }
+// POST /wishlist/clear
+function clear(req, res) {
+  req.session.wishlist = [];
+  redirectBack(req, res);
+}
 
-  req.session.wishlist.items = items;
-  res.json({ ok: true, inWishlist, count: items.length });
+// POST /wishlist/toggle/:id
+// src/controllers/wishlist.controller.js
+function toggle(req, res) {
+  const id = String(req.params.id || '').trim();
+  if (!id) return res.redirect(req.get('referer') || '/products');
+
+  let list = Array.isArray(req.session.wishlist) ? req.session.wishlist.map(String) : [];
+  const ix = list.indexOf(id);
+
+  let wished;
+  if (ix === -1) { list.push(id); wished = true; }
+  else { list.splice(ix, 1); wished = false; }
+
+  req.session.wishlist = list;
+  req.session.save(() => {
+    // If you ever want AJAX, you already have the payload:
+    if (req.xhr || (req.headers.accept || '').includes('application/json')) {
+      return res.json({ ok: true, wished, count: list.length });
+    }
+    res.redirect(req.get('referer') || '/products');
+  });
 };
 
+
+module.exports = { index, add, remove, clear,toggle};

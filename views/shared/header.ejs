@@ -8,78 +8,147 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <nav class="topnav">
-    <div class="bar">
-      <a class="nav-brand" href="/products">Training Shop</a>
 
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navlinks">Menu</button>
+<% // robust wishlist count (supports wishIds, wishCount, wishlistCount)
+   const WL_COUNT = Number(
+     (typeof wishlistCount !== 'undefined' && wishlistCount != null) ? wishlistCount :
+     (typeof wishCount !== 'undefined'   && wishCount   != null) ? wishCount :
+     (Array.isArray(wishIds) ? wishIds.length : 0)
+   );
+%>
 
-      <div id="navlinks" class="nav-links">
-        <% if (currentUser && currentUser.role === 'Admin') { %>
-          <a href="/admin/dashboard">Admin Dashboard</a>
-          <a href="/admin/products">Admin Products</a>
-          <a href="/admin/categories">Admin Categories</a>
-          <a href="/admin/coupons">Admin Coupons</a>
-          <a href="/admin/orders">Admin Orders</a>
-          <a href="/admin/reviews">Admin Reviews</a>
-        <% } %>
+<nav class="ts-nav">
+  <div class="ts-nav__bar">
+    <a class="ts-nav__brand" href="/products">Training Shop</a>
 
-        <a href="/wishlist" class="btn" title="Wishlist">
-          <span class="heart-icon <%= (wishlistCount||0) > 0 ? 'has-items' : '' %>" aria-hidden="true">♥</span>
-          <span class="badge" data-wishlist-count><%= wishlistCount || 0 %></span>
-        </a>
+    <button class="ts-nav__toggle" type="button" aria-expanded="false" aria-controls="ts-links">Menu</button>
 
-        <a href="/cart" class="btn">Cart <span class="badge"><%= cartCount %></span></a>
+    <div id="ts-links" class="ts-nav__links">
+      <% if (currentUser && currentUser.role === 'Admin') { %>
+        <div class="ts-dropdown">
+          <button class="ts-btn ts-pill" type="button">Admin</button>
+          <div class="ts-menu">
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/products">Products</a>
+            <a href="/admin/categories">Categories</a>
+            <a href="/admin/coupons">Coupons</a>
+            <a href="/admin/orders">Orders</a>
+            <a href="/admin/reviews">Reviews</a>
+          </div>
+        </div>
+      <% } %>
 
-        <% if (currentUser) { %>
-          <a href="/account" class="btn">My Account</a>
-          <a href="/account/orders" class="btn">My Orders</a>
-          <a href="/account/addresses" class="btn">My Addresses</a>
-          <span class="small">Hello, <%= currentUser.name || currentUser.email %></span>
-          <form method="POST" action="/auth/logout" style="display:inline">
-            <button type="submit" class="btn">Logout</button>
-          </form>
-        <% } else { %>
-          <a href="/auth/login" class="btn">Login</a>
-          <a href="/auth/register" class="btn btn--brand">Register</a>
-        <% } %>
-      </div>
+      <a href="/wishlist" class="ts-btn ts-pill" title="Wishlist">
+        <span class="ts-heart <%= WL_COUNT > 0 ? 'is-on' : '' %>" aria-hidden="true">♥</span>
+        <span class="ts-badge" data-wishlist-count><%= WL_COUNT %></span>
+      </a>
 
-      <span class="spacer"></span>
+      <a href="/cart" class="ts-btn ts-pill">
+        Cart <span class="ts-badge"><%= Number(cartCount || 0) %></span>
+      </a>
+
+      <% if (currentUser) { %>
+        <div class="ts-dropdown">
+          <button class="ts-btn ts-pill" type="button">Account</button>
+          <div class="ts-menu ts-menu--right">
+            <div class="ts-menu__muted">Hello, <%= currentUser.name || currentUser.email %></div>
+            <div class="ts-menu__sep"></div>
+            <a href="/account">My Account</a>
+            <a href="/account/orders">My Orders</a>
+            <a href="/account/addresses">My Addresses</a>
+            <div class="ts-menu__sep"></div>
+            <form method="POST" action="/auth/logout">
+              <button type="submit" class="ts-menu__btn">Logout</button>
+            </form>
+          </div>
+        </div>
+      <% } else { %>
+        <a href="/auth/login" class="ts-btn">Login</a>
+        <a href="/auth/register" class="ts-btn ts-btn--brand">Register</a>
+      <% } %>
     </div>
-  </nav>
 
-  <% if (banner) { %>
-    <div class="alert alert-warning container"><%= banner %></div>
-  <% } %>
+    <span class="ts-nav__spacer"></span>
+  </div>
+</nav>
 
-  <main class="container">
+<% if (banner) { %>
+  <div class="alert alert-warning container"><%= banner %></div>
+<% } %>
 
-  <style>
-    /* tiny bit to make the heart icon not look broken if CSS misses it */
-    .heart-icon { font-size: 16px; color: #888; margin-right: 6px; }
-    .heart-icon.has-items { color: #e0245e; }
-    /* mobile nav helper */
-    .nav-links { display:flex; gap:12px; align-items:center; }
-    @media (max-width: 768px) {
-      .nav-toggle { display:inline-flex; }
-      .nav-links { display:none; flex-direction:column; align-items:flex-start; padding:10px 0; }
-      .nav-links.open { display:flex; }
-    }
-    @media (min-width: 769px) {
-      .nav-toggle { display:none; }
-    }
-  </style>
+<main class="container"><!-- keep your original container for page content -->
 
-  <script>
-    // simple menu toggle on mobile
-    (function(){
-      const btn = document.querySelector('.nav-toggle');
-      const links = document.getElementById('navlinks');
-      if (!btn || !links) return;
+<style>
+  /* ===== Header-only, namespaced styles (won't affect your pages) ===== */
+  .ts-nav{border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0;z-index:50}
+  .ts-nav__bar{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  .ts-nav__brand{font-weight:800;font-size:20px;color:#111;text-decoration:none}
+  .ts-nav__spacer{flex:1}
+
+  .ts-nav__links{display:flex;align-items:center;gap:10px}
+  .ts-nav__toggle{display:none;border:1px solid #e5e7eb;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer}
+
+  .ts-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid #e5e7eb;background:#fff;color:#0f172a;
+         padding:8px 12px;border-radius:10px;text-decoration:none;cursor:pointer}
+  .ts-btn--brand{background:#2563eb;border-color:#2563eb;color:#fff}
+  .ts-pill{background:#f8fafc}
+  .ts-badge{min-width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
+            border:1px solid #e5e7eb;background:#fff;font-weight:600;color:#2563eb;padding:0 6px}
+  .ts-heart{font-size:18px;color:#a3a3a3}
+  .ts-heart.is-on{color:#e11d48}
+
+  .ts-dropdown{position:relative}
+  .ts-dropdown .ts-menu{
+    position:absolute;top:100%;left:0;margin-top:6px;
+    background:#fff;border:1px solid #e5e7eb;border-radius:12px;
+    box-shadow:0 10px 30px rgba(2,6,23,.08);min-width:220px;padding:6px;display:none;z-index:1000
+  }
+  .ts-dropdown .ts-menu.ts-menu--right{left:auto;right:0}
+  .ts-dropdown.open .ts-menu{display:block}
+
+  .ts-dropdown .ts-menu a,
+  .ts-dropdown .ts-menu .ts-menu__btn{
+    display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;
+    border:none;background:transparent;color:#0f172a;text-decoration:none;cursor:pointer
+  }
+  .ts-dropdown .ts-menu a:hover,
+  .ts-dropdown .ts-menu .ts-menu__btn:hover{background:#f8fafc}
+  .ts-menu__muted{padding:8px 12px;color:#6b7280}
+  .ts-menu__sep{height:1px;background:#e5e7eb;margin:6px}
+
+  /* mobile */
+  @media (max-width: 768px){
+    .ts-nav__toggle{display:inline-flex}
+    .ts-nav__links{display:none;flex-direction:column;align-items:flex-start;padding:10px 0}
+    .ts-nav__links.open{display:flex}
+  }
+</style>
+
+<script>
+  // mobile menu toggle (scoped)
+  (function(){
+    const btn = document.querySelector('.ts-nav__toggle');
+    const links = document.getElementById('ts-links');
+    if (btn && links) {
       btn.addEventListener('click', function(){
         const open = links.classList.toggle('open');
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
-    })();
-  </script>
+    }
+  })();
+
+  // dropdowns: click-to-open (no hover gap), click outside to close
+  (function(){
+    document.querySelectorAll('.ts-dropdown > .ts-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const dd = btn.parentElement;
+        document.querySelectorAll('.ts-dropdown.open').forEach(x=>{ if(x!==dd) x.classList.remove('open'); });
+        dd.classList.toggle('open');
+      });
+    });
+    document.addEventListener('click', ()=> {
+      document.querySelectorAll('.ts-dropdown.open').forEach(x=> x.classList.remove('open'));
+    });
+  })();
+</script>
