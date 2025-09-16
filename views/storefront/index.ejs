@@ -31,8 +31,30 @@
 <% } else { %>
   <%
     // wishlist ids can come in as Set, Array, or be undefined
-    const _src = (typeof locals !== 'undefined' && locals.wishIds !== undefined) ? locals.wishIds : (typeof wishIds !== 'undefined' ? wishIds : []);
+    const _src = (typeof locals !== 'undefined' && locals.wishIds !== undefined)
+      ? locals.wishIds
+      : (typeof wishIds !== 'undefined' ? wishIds : []);
     const wishSet = new Set(Array.isArray(_src) ? _src.map(String) : Array.from(_src || [], String));
+
+    // ---------- Image helper: show product photo if present; otherwise show a TITLE PLACEHOLDER ----------
+    function looksRandom(url) {
+      if (!url) return true;
+      const u = String(url);
+      return /source\.unsplash\.com\/|unsplash\.com\/random/i.test(u)
+          || (/picsum\.photos\/\d+/i.test(u) && !/picsum\.photos\/seed\//i.test(u))
+          || (/loremflickr\.com\/\d+\/\d+(?:$|[?#])/i.test(u) && !/[?&]lock=/.test(u));
+    }
+    function cardImage(p) {
+      const first = ((Array.isArray(p.images) && p.images.length) ? p.images[0] : (p.image || '')).trim();
+
+  // Only trust files served from your app's uploads folder.
+  const isLocalUpload = /^\/uploads\//.test(first);
+  if (isLocalUpload) return first;
+
+  // Anything else (unsplash/picsum/loremflickr/any external URL) → use a stable text placeholder
+  const label = encodeURIComponent(String(p.title || p.sku || 'Product'));
+  return `https://placehold.co/600x450?text=${label}`;
+    }
   %>
 
   <style>
@@ -43,27 +65,20 @@
 
   <div class="product-grid">
     <% products.forEach(p => {
-         const img = (Array.isArray(p.images) && p.images.length) ? p.images[0] : (p.image || '');
          const href = p.slug ? ('/p/' + p.slug) : ('/products/id/' + p._id);
          const isWished = wishSet.has(String(p._id));
     %>
       <article class="product-card">
         <a class="thumb" href="<%= href %>">
-          <% if (img) { %>
-            <img
-              src="<%= img %>"
-              alt="<%= p.title %>"
-              loading="lazy"
-              decoding="async"
-            >
-          <% } else { %>
-            <img
-              src="https://via.placeholder.com/600x450?text=No+Image"
-              alt=""
-              loading="lazy"
-              decoding="async"
-            >
-          <% } %>
+          <img
+            src="<%= cardImage(p) %>"
+            alt="<%= p.title %>"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            crossorigin="anonymous"
+            onerror="this.onerror=null; this.src='https://placehold.co/600x450?text=<%= encodeURIComponent(p.title) %>';"
+          >
         </a>
 
         <!-- Heart / wishlist toggle -->

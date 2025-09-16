@@ -1,13 +1,16 @@
 // src/controllers/review.controller.js
-const Review  = require('../models/Review');
-const Product = require('../models/Product');
+'use strict';
+
 const mongoose = require('mongoose');
-// POST /reviews  (must be logged in)
+const Review   = require('../models/Review');
+const Product  = require('../models/Product');
+
+// POST /reviews  (must be logged in via requireAuth)
 exports.create = async (req, res, next) => {
   try {
     const { productId, rating, title = '', body = '' } = req.body;
 
-    // Basic validation (simple & friendly)
+    // --- Basic validation ---
     const errors = [];
     if (!productId) errors.push('Missing product.');
     const r = Number(rating);
@@ -17,7 +20,7 @@ exports.create = async (req, res, next) => {
     const product = productId ? await Product.findById(productId).lean() : null;
     if (!product) errors.push('Product not found.');
 
-    // Decide the detail URL your site actually serves
+    // Decide product detail URL (slug first, else ID)
     const detailUrl = product
       ? (product.slug ? `/p/${product.slug}` : `/products/id/${product._id}`)
       : '/products';
@@ -28,9 +31,43 @@ exports.create = async (req, res, next) => {
     }
 
     const u = req.session.user || {};
+    const customerId = u._id ? new mongoose.Types.ObjectId(u._id) : null;
+
+    // One-review-per-customer-per-product:
+    // If a review exists, update it (and re-mark as Pending).
+    const existing = await Review.findOne({
+      productId: new mongoose.Types.ObjectId(product._id),
+      customerId: customerId
+    });
+
+    if (existing) {
+      if (existing.status === 'Approved') {
+        // policy: do not allow changing an already approved review
+        req.session.flash = 'You already have an approved review for this product.';
+        return res.redirect(detailUrl);
+      }
+
+      await Review.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            rating: r,
+            title: title || '',
+            body:  body  || '',
+            status: 'Pending',
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      req.session.flash = 'Thanks! Your review was updated and resubmitted for approval.';
+      return res.redirect(detailUrl);
+    }
+
+    // Otherwise, create a new review
     await Review.create({
-      productId:      product._id,
-      customerId:     u._id || null,
+      productId:      new mongoose.Types.ObjectId(product._id),
+      customerId:     customerId,
       customerEmail:  u.email || '',
       customerName:   u.name  || '',
       rating:         r,
@@ -41,7 +78,38 @@ exports.create = async (req, res, next) => {
 
     req.session.flash = 'Thanks! Your review was submitted and will appear after approval.';
     return res.redirect(detailUrl);
-  } catch (e) { next(e); }
+  } catch (e) {
+    // Gracefully handle rare race condition against the unique index
+    if (e && e.code === 11000) {
+      try {
+        const u = req.session.user || {};
+        const customerId = u._id ? new mongoose.Types.ObjectId(u._id) : null;
+        const { productId, rating, title = '', body = '' } = req.body;
+        const product = await Product.findById(productId).lean();
+        const detailUrl = product
+          ? (product.slug ? `/p/${product.slug}` : `/products/id/${product._id}`)
+          : '/products';
+
+        await Review.updateOne(
+          { productId: new mongoose.Types.ObjectId(productId), customerId },
+          {
+            $set: {
+              rating: Number(rating),
+              title: title || '',
+              body:  body  || '',
+              status: 'Pending',
+              updatedAt: new Date()
+            }
+          }
+        );
+        req.session.flash = 'Your review was updated and resubmitted for approval.';
+        return res.redirect(detailUrl);
+      } catch (inner) {
+        return next(inner);
+      }
+    }
+    return next(e);
+  }
 };
 
 // GET /admin/reviews

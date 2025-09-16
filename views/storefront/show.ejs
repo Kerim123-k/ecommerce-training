@@ -1,38 +1,49 @@
 <%- include('../shared/header', { title: (product && product.title) || 'Product' }) %>
 
 <%
-  // Normalize images for gallery
+  // Normalize main image(s)
   const images = Array.isArray(product?.images) && product.images.length
     ? product.images
     : (product?.image ? [product.image] : []);
 
-  // Make a Set from wishlist ids regardless of incoming type (Set | Array | undefined)
-  const wishSet = new Set(Array.from((locals && locals.wishIds) || wishIds || [], String));
+  // Wishlist ids (Set or Array) → Set of strings
+  const wishSrc = (typeof locals !== 'undefined' && locals.wishIds !== undefined)
+    ? locals.wishIds
+    : (typeof wishIds !== 'undefined' ? wishIds : []);
+  const wishSet = new Set(Array.isArray(wishSrc) ? wishSrc.map(String) : Array.from(wishSrc || [], String));
   const wished  = wishSet.has(String(product._id));
+
+  // Graceful default for canReview from controller
+  const canReviewSafe = (typeof canReview !== 'undefined') ? !!canReview : false;
+  const user = (locals && locals.currentUser) || null;
 %>
 
 <style>
-  .product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:24px}
-  .product-show__gallery img{width:100%;height:auto;border-radius:12px;display:block}
-  .price-lg{font-size:1.5rem;font-weight:700;margin:8px 0}
-  .heart-btn{font-size:30px;line-height:1;border:none;background:none;cursor:pointer;color:#b8b8b8}
-  .heart-btn.is-active{color:#e02424}
-  .heart-btn:focus{outline:none}
-  .wishbar{display:flex;align-items:center;gap:10px;margin:8px 0 16px}
+  .product-show { display:grid; grid-template-columns:1.2fr .8fr; gap:24px; }
+  .price-lg { font-size:1.5rem; font-weight:700; margin:8px 0; }
+  .wishbar { display:flex; align-items:center; gap:10px; margin:8px 0 16px; }
+  .heart-btn { font-size:30px; line-height:1; border:none; background:none; cursor:pointer; color:#b8b8b8; }
+  .heart-btn.is-active { color:#e02424; }
+  .heart-btn:focus { outline:none; }
+
+  .rev-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .rev-item { border-top:1px solid #eee; padding:12px 0; }
+  .rev-title { font-weight:600; }
+  .rev-muted { color:#666; font-size:.9rem; }
+
+  .alert { padding:.7rem 1rem; border-radius:8px; background:#f2f6ff; border:1px solid #d9e4ff; margin:10px 0; }
+  .form small.muted { color:#666; }
 </style>
 
 <section class="product-show">
-  <div class="product-show__gallery">
-    <% if (images.length) { %>
-      <img src="<%= images[0] %>" alt="<%= product.title %>">
-    <% } else { %>
-      <img src="https://via.placeholder.com/800x600?text=Product" alt="">
-    <% } %>
+  <div>
+    <!-- Image gallery -->
+    <%- include('../shared/product_gallery', { item: product, images }) %>
   </div>
 
-  <aside class="product-show__info">
+  <aside>
     <h1><%= product.title %></h1>
-    <p class="muted">SKU <%= product.sku %></p>
+    <% if (product.sku) { %><p class="muted">SKU <%= product.sku %></p><% } %>
 
     <div class="wishbar">
       <form method="POST" action="/wishlist/toggle/<%= product._id %>">
@@ -52,8 +63,73 @@
 </section>
 
 <section class="block" style="margin-top:28px;">
-  <h2>Reviews</h2>
-  <p class="muted">No one has reviewed this product yet.</p>
+  <div class="rev-head">
+    <h2 style="margin:0;">Reviews</h2>
+    <span class="muted">
+      <%= Number(rating?.avg || 0).toFixed(1) %>/5 · <%= rating?.count || 0 %> review<%= (rating?.count||0) === 1 ? '' : 's' %>
+    </span>
+  </div>
+
+  <% if (flash) { %>
+    <div class="alert"><%= flash %></div>
+  <% } %>
+
+  <!-- Submit review -->
+  <% if (user) { %>
+    <% if (canReviewSafe) { %>
+      <form method="POST" action="/reviews" class="form" style="max-width:520px; margin-bottom:18px;">
+        <input type="hidden" name="productId" value="<%= product._id %>">
+
+        <label>Rating*
+          <select name="rating" required>
+            <option value="5">5 – Excellent</option>
+            <option value="4">4 – Good</option>
+            <option value="3">3 – Okay</option>
+            <option value="2">2 – Poor</option>
+            <option value="1">1 – Bad</option>
+          </select>
+        </label>
+
+        <label>Title
+          <input name="title" maxlength="80" placeholder="Optional short title">
+        </label>
+
+        <label>Comment*
+          <textarea name="body" rows="4" maxlength="1000" required placeholder="Share your experience…"></textarea>
+        </label>
+
+        <small class="muted">Your review appears after admin approval.</small>
+        <div style="margin-top:10px;">
+          <button class="btn btn--brand" type="submit">Submit review</button>
+        </div>
+      </form>
+    <% } else { %>
+      <p class="muted">You can review this product after purchasing it.</p>
+    <% } %>
+  <% } else { %>
+    <p class="muted">Please <a href="/auth/login">sign in</a> to write a review.</p>
+  <% } %>
+
+  <!-- Existing reviews -->
+  <% if ((reviews || []).length === 0) { %>
+    <p class="muted">No one has reviewed this product yet.</p>
+  <% } else { %>
+    <div>
+      <% reviews.forEach(rv => { %>
+        <div class="rev-item">
+          <div class="rev-title">
+            <span><%= '★'.repeat(Math.max(1, Math.min(5, Number(rv.rating)||0))) %><%= '☆'.repeat(5 - Math.max(1, Math.min(5, Number(rv.rating)||0))) %></span>
+            <span style="margin-left:8px;"><%= rv.title || '' %></span>
+          </div>
+          <div class="rev-muted">
+            <%= rv.customerName || rv.customerEmail || 'Anonymous' %> ·
+            <%= new Date(rv.createdAt).toLocaleDateString() %>
+          </div>
+          <div><%= rv.body %></div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
 </section>
 
 <%- include('../shared/footer') %>

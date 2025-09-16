@@ -22,6 +22,32 @@ function getWishIdSet(req) {
   return new Set(list.map(x => String(x?.productId ?? x)));
 }
 
+
+async function userCanReview(req, productId) {
+  const userId = req.session?.user?._id;
+  if (!userId) return false;
+
+  // Already reviewed?
+  const already = await Review.exists({
+    userId: new mongoose.Types.ObjectId(userId),
+    productId: new mongoose.Types.ObjectId(productId)
+  });
+  if (already) return false;
+
+  // Has purchased this product?
+  const purchased = await Order.exists({
+    $or: [
+      { userId: new mongoose.Types.ObjectId(userId) },            // if your Order has userId
+      { customerId: new mongoose.Types.ObjectId(userId) },        // if your Order has customerId
+      { 'customer._id': new mongoose.Types.ObjectId(userId) }     // if your Order embeds a customer object
+    ],
+    'items.productId': new mongoose.Types.ObjectId(productId),
+    status: { $in: ['Paid', 'Processing', 'Shipped', 'Delivered'] }
+  });
+
+  return !!purchased;
+}
+
 async function buildRating(productId) {
   const [stats] = await Review.aggregate([
     { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'Approved' } },
@@ -49,6 +75,35 @@ function ensureImagesArray(p) {
     p.images = [p.image, ...p.images.filter(u => u !== p.image)];
   }
   return p.images;
+}
+
+/**
+ * Can the current user write a review for this product?
+ * Rules:
+ *  - must be logged in
+ *  - must have an order containing the product (Delivered check optional)
+ *  - must not have already reviewed the product
+ */
+async function canUserReview(req, productId) {
+  const userId = req.session?.user?._id;
+  if (!userId) return false;
+
+  const pid = new mongoose.Types.ObjectId(productId);
+
+  // Order line schema may be items.product or items.productId — support both
+  const purchased = await Order.exists({
+    user: userId,
+    $or: [
+      { 'items.product': pid },
+      { 'items.productId': pid },
+    ],
+    // If you only want after-delivery reviews, uncomment:
+    // status: 'Delivered',
+  });
+
+  const already = await Review.exists({ user: userId, productId: pid });
+
+  return !!purchased && !already;
 }
 
 /* ================================================================== */
@@ -268,7 +323,6 @@ exports.showEither = async (req, res, next) => {
         _id: key, status: 'Active', isDeleted: { $ne: true }
       }).populate('categories').lean();
     }
-
     if (!product) return res.status(404).send('Product not found');
 
     const qty      = Number(product.stockQty || 0);
@@ -280,23 +334,48 @@ exports.showEither = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // compute canReview
+    let canReview = false;
+    const u = req.session?.user;
+    if (u) {
+      const purchase = await Order.exists({
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        'items.productId': new mongoose.Types.ObjectId(product._id),
+        status: { $in: ['Paid', 'Processing', 'Shipped', 'Delivered'] }
+      });
+
+      const already = await Review.exists({
+        productId: product._id,
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        status: { $in: ['Pending', 'Approved'] }
+      });
+
+      canReview = !!purchase && !already;
+    }
+
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    const wishIds = getWishIdSet(req);
+    // existing wishIds logic you already have
+    const wishIds = (req.session?.wishlist && new Set(req.session.wishlist.map(x => String(x?.productId ?? x)))) || new Set();
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
+    res.render('storefront/show', {
+      product, inStock, lowStock, rating, reviews, flash, wishIds, canReview
+    });
   } catch (e) { next(e); }
 };
 
 exports.show = async (req, res, next) => {
   try {
     const product = await Product.findOne({
-      slug: req.params.slug,
-      status: 'Active',
-      isDeleted: { $ne: true },
+      slug: req.params.slug, status: 'Active', isDeleted: { $ne: true }
     }).populate('categories').lean();
-
     if (!product) return res.status(404).send('Product not found');
 
     const qty      = Number(product.stockQty || 0);
@@ -305,15 +384,41 @@ exports.show = async (req, res, next) => {
 
     const rating  = await buildRating(product._id);
     const reviews = await Review.find({ productId: product._id, status: 'Approved' })
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort({ createdAt: -1 }).lean();
+
+    // compute canReview
+    let canReview = false;
+    const u = req.session?.user;
+    if (u) {
+      const purchase = await Order.exists({
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        'items.productId': new mongoose.Types.ObjectId(product._id),
+        status: { $in: ['Paid', 'Processing', 'Shipped', 'Delivered'] }
+      });
+
+      const already = await Review.exists({
+        productId: product._id,
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        status: { $in: ['Pending', 'Approved'] }
+      });
+
+      canReview = !!purchase && !already;
+    }
 
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    const wishIds = getWishIdSet(req);
+    const wishIds = (req.session?.wishlist && new Set(req.session.wishlist.map(x => String(x?.productId ?? x)))) || new Set();
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
+    res.render('storefront/show', {
+      product, inStock, lowStock, rating, reviews, flash, wishIds, canReview
+    });
   } catch (e) { next(e); }
 };
 
@@ -321,39 +426,55 @@ exports.show = async (req, res, next) => {
 exports.showById = async (req, res, next) => {
   try {
     const product = await Product.findOne({
-      _id: req.params.id,
-      status: 'Active',
-      isDeleted: { $ne: true }
+      _id: req.params.id, status: 'Active', isDeleted: { $ne: true }
     }).lean();
-
     if (!product) return res.status(404).send('Not found');
 
-    const qty = Number(product.stockQty || 0);
+    const qty      = Number(product.stockQty || 0);
     const inStock  = qty > 0;
     const lowStock = product.trackInventory !== false && inStock && qty <= 5;
 
-    const [stats] = await Review.aggregate([
-      { $match: { productId: product._id, status: 'Approved' } },
-      { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: '$rating' } } }
-    ]);
-
+    const rating  = await buildRating(product._id);
     const reviews = await Review.find({ productId: product._id, status: 'Approved' })
       .sort({ createdAt: -1 })
       .lean();
 
-    const rating = {
-      count: stats?.count || 0,
-      avg: stats ? Number(stats.avg.toFixed(2)) : 0
-    };
+    // compute canReview
+    let canReview = false;
+    const u = req.session?.user;
+    if (u) {
+      const purchase = await Order.exists({
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        'items.productId': new mongoose.Types.ObjectId(product._id),
+        status: { $in: ['Paid', 'Processing', 'Shipped', 'Delivered'] }
+      });
+
+      const already = await Review.exists({
+        productId: product._id,
+        $or: [
+          { customerId: u._id },
+          { customerEmail: u.email }
+        ],
+        status: { $in: ['Pending', 'Approved'] }
+      });
+
+      canReview = !!purchase && !already;
+    }
 
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    const wishIds = getWishIdSet(req);
+    const wishIds = (req.session?.wishlist && new Set(req.session.wishlist.map(x => String(x?.productId ?? x)))) || new Set();
 
-    res.render('storefront/show', { product, inStock, lowStock, rating, reviews, flash, wishIds });
+    res.render('storefront/show', {
+      product, inStock, lowStock, rating, reviews, flash, wishIds, canReview
+    });
   } catch (e) { next(e); }
 };
+
 
 // GET /c/:slug
 exports.categoryPage = async (req, res, next) => {

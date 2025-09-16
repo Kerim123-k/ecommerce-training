@@ -1,4 +1,4 @@
-,<%- include('../shared/header', { title: 'Pay by card (Demo)' }) %>
+<%- include('../shared/header', { title: 'Pay by card (Demo)' }) %>
 
 <h1>Pay by card (Demo)</h1>
 <p class="muted">This is a demo form—no real charges are made.</p>
@@ -9,54 +9,143 @@
   </div>
 <% } %>
 
-<form method="POST" action="/checkout/card?method=<%= selectedShipping %>">
-  <div class="grid" style="grid-template-columns:1fr 1fr; gap:12px; max-width:900px;">
-    <label>Cardholder name*
-      <input name="name" value="<%= values.name || '' %>" required>
-    </label>
-    <label>Card number*
-      <input name="number" value="<%= values.number || '4242 4242 4242 4242' %>" required>
-    </label>
-    <label>Exp. month*
-      <input name="expMonth" value="<%= values.expMonth || '' %>" placeholder="MM" required>
-    </label>
-    <label>Exp. year*
-      <input name="expYear" value="<%= values.expYear || '' %>" placeholder="YY" required>
-    </label>
-    <label>CVV*
-      <input name="cvv" value="<%= values.cvv || '' %>" placeholder="123" required>
-    </label>
-  </div>
+<form method="POST" action="/checkout/card?method=<%= selectedShipping %>" novalidate>
+  <div class="grid" style="grid-template-columns: 1fr; gap: 16px; max-width: 720px;">
 
-  <h2 style="margin-top:16px;">Order summary</h2>
-  <div class="card pad" style="max-width:560px;">
-    <div class="hstack" style="justify-content:space-between;">
-      <span>Subtotal</span><strong>₺ <%= totals.subtotal.toFixed(2) %></strong>
-    </div>
+    <!-- Card details -->
+    <section class="card pad">
+      <div class="form-grid cols-2">
+        <div class="field field--full">
+          <label for="cc-name">Cardholder name*</label>
+          <input id="cc-name"
+                 name="name"
+                 autocomplete="cc-name"
+                 required
+                 value="<%= values.name || '' %>">
+        </div>
 
-    <% if (Number(totals.discount || 0) > 0) { %>
-      <div class="hstack" style="justify-content:space-between;">
-        <span>Discount <%= appliedCoupon && appliedCoupon.code ? '('+ appliedCoupon.code +')' : '' %></span>
-        <span>- ₺ <%= Number(totals.discount).toFixed(2) %></span>
+        <div class="field field--full">
+          <label for="cc-number">Card number*</label>
+          <input id="cc-number"
+                 name="number"
+                 inputmode="numeric"
+                 autocomplete="cc-number"
+                 placeholder="4242 4242 4242 4242"
+                 maxlength="19"
+                 required
+                 value="<%= values.number || '' %>">
+        </div>
+
+        <!-- Exp + CVV row -->
+        <div class="field">
+          <label for="cc-exp-month">Exp. month*</label>
+          <input id="cc-exp-month"
+                 name="expMonth"
+                 inputmode="numeric"
+                 autocomplete="cc-exp-month"
+                 placeholder="MM"
+                 maxlength="2"
+                 required
+                 value="<%= values.expMonth || '' %>">
+        </div>
+
+        <div class="field">
+          <label for="cc-exp-year">Exp. year*</label>
+          <input id="cc-exp-year"
+                 name="expYear"
+                 inputmode="numeric"
+                 autocomplete="cc-exp-year"
+                 placeholder="YY"
+                 maxlength="2"
+                 required
+                 value="<%= values.expYear || '' %>">
+        </div>
+
+        <div class="field">
+          <label for="cc-cvv">CVV*</label>
+          <input id="cc-cvv"
+                 name="cvv"
+                 inputmode="numeric"
+                 autocomplete="cc-csc"
+                 placeholder="123"
+                 maxlength="4"
+                 required
+                 value="<%= values.cvv || '' %>">
+        </div>
       </div>
-    <% } %>
+    </section>
 
-    <div class="hstack" style="justify-content:space-between;">
-      <span>Tax</span><span>₺ <%= totals.tax.toFixed(2) %></span>
-    </div>
-    <div class="hstack" style="justify-content:space-between;">
-      <span>Shipping</span>
-      <span>₺ <%= totals.shipping.toFixed(2) %> (<%= shippingLabel || selectedShipping %>)</span>
-    </div>
-    <div class="hstack" style="justify-content:space-between; font-weight:600; font-size:1.1rem;">
-      <span>Total</span><strong>₺ <%= totals.grandTotal.toFixed(2) %></strong>
-    </div>
-  </div>
+    <!-- Order summary -->
+    <section class="card pad" style="max-width: 720px;">
+      <h2 style="margin:0 0 8px 0;">Order summary</h2>
+      <div class="hstack" style="justify-content:space-between;">
+        <span>Subtotal</span><strong>₺ <%= totals.subtotal.toFixed(2) %></strong>
+      </div>
 
-  <div class="hstack" style="gap:10px; margin-top:12px;">
-    <a class="btn" href="/checkout?method=<%= selectedShipping %>">Back</a>
-    <button class="btn btn--brand" type="submit">Pay ₺ <%= totals.grandTotal.toFixed(2) %></button>
+      <% if (Number(totals.discount || 0) > 0) { %>
+        <div class="hstack" style="justify-content:space-between;">
+          <span>Discount <%= appliedCoupon && appliedCoupon.code ? '('+ appliedCoupon.code +')' : '' %></span>
+          <span>- ₺ <%= Number(totals.discount).toFixed(2) %></span>
+        </div>
+      <% } %>
+
+      <div class="hstack" style="justify-content:space-between;">
+        <span>Tax</span><span>₺ <%= totals.tax.toFixed(2) %></span>
+      </div>
+      <div class="hstack" style="justify-content:space-between;">
+        <span>Shipping</span>
+        <span>₺ <%= totals.shipping.toFixed(2) %> (<%= shippingLabel || selectedShipping %>)</span>
+      </div>
+      <div class="hstack" style="justify-content:space-between; font-weight:600; font-size:1.1rem;">
+        <span>Total</span><strong>₺ <%= totals.grandTotal.toFixed(2) %></strong>
+      </div>
+    </section>
+
+    <div class="hstack" style="gap:10px;">
+      <a class="btn" href="/checkout?method=<%= selectedShipping %>">Back</a>
+      <button class="btn btn--brand" type="submit">Pay ₺ <%= totals.grandTotal.toFixed(2) %></button>
+    </div>
   </div>
 </form>
+
+<script>
+(function () {
+  // Auto-format card number into groups of 4: "4242 4242 4242 4242"
+  const numEl = document.getElementById('cc-number');
+  function formatCard(val) {
+    return val
+      .replace(/\D/g, '')         // digits only
+      .slice(0, 16)               // max 16 digits for demo
+      .replace(/(\d{4})(?=\d)/g, '$1 ')
+      .trim();
+  }
+  numEl.addEventListener('input', () => {
+    const before = numEl.value;
+    numEl.value = formatCard(before);
+  });
+
+  // Clamp numeric fields (MM, YY, CVV)
+  const clamp = (id, max) => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      el.value = el.value.replace(/\D/g, '').slice(0, max);
+    });
+  };
+  clamp('cc-exp-month', 2);
+  clamp('cc-exp-year', 2);
+  clamp('cc-cvv', 4);
+
+  // Normalize month on blur (01..12)
+  const mm = document.getElementById('cc-exp-month');
+  mm.addEventListener('blur', () => {
+    let m = parseInt(mm.value, 10);
+    if (!isNaN(m)) {
+      if (m < 1) m = 1;
+      if (m > 12) m = 12;
+      mm.value = String(m).padStart(2, '0');
+    }
+  });
+})();
+</script>
 
 <%- include('../shared/footer') %>

@@ -1,30 +1,62 @@
-<!-- views/products/show.ejs -->
-<%- include('../shared/header', { title: (p && p.title) || 'Product' }) %>
+<%- include('../shared/header', { title: (product && product.title) || 'Product' }) %>
 
 <%
-// Normalize images for gallery
-const images = Array.isArray(p?.images) && p.images.length ? p.images : (p?.image ? [p.image] : []);
+  // Build images array (primary + gallery)
+  const imgs = Array.isArray(product?.images) && product.images.length
+    ? product.images
+    : (product?.image ? [product.image] : []);
+
+  // Wishlist state (works with Set or Array)
+  const wishSrc  = (locals?.wishIds !== undefined) ? locals.wishIds : (typeof wishIds !== 'undefined' ? wishIds : []);
+  const wishSet  = new Set(Array.isArray(wishSrc) ? wishSrc.map(String) : Array.from(wishSrc || [], String));
+  const wished   = wishSet.has(String(product._id));
 %>
 
-<section class="container" style="margin-top:20px;">
-  <!-- Gallery -->
-  <%- include('../shared/product_gallery', { item: p, images }) %>
+<style>
+  .product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:24px}
+  .price-lg{font-size:1.5rem;font-weight:700;margin:8px 0}
+  .heart-btn{font-size:30px;line-height:1;border:none;background:none;cursor:pointer;color:#b8b8b8}
+  .heart-btn.is-active{color:#e02424}
+  .heart-btn:focus{outline:none}
+  .wishbar{display:flex;align-items:center;gap:10px;margin:8px 0 16px}
 
-  <!-- Info (kept simple; matches your current layout) -->
-  <div style="margin-top:18px;">
-    <h1><%= p.title %></h1>
-    <p class="muted">SKU <%= p.sku %></p>
-    <p style="font-size:20px;font-weight:600;">₺ <%= Number(p.price || 0).toFixed(2) %></p>
+  /* a little layout help for the gallery */
+  .product-show__gallery .product-gallery .pg-main img{width:100%;height:auto;border-radius:12px;display:block}
+  .product-show__gallery .pg-thumbs{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .product-show__gallery .pg-thumb{border:1px solid #e6e6e6;border-radius:8px;padding:0;background:#fff;cursor:pointer}
+  .product-show__gallery .pg-thumb.is-active{outline:2px solid #2d6cdf}
+  .product-show__gallery .pg-thumb img{display:block;width:86px;height:64px;object-fit:cover;border-radius:7px}
+  @media (max-width: 900px){ .product-show{grid-template-columns:1fr} }
+</style>
 
-    <form method="POST" action="/cart/add/<%= p._id %>" class="hstack" style="gap:10px;">
-      <input type="number" name="qty" value="1" min="1" class="input" style="width:80px;">
+<section class="product-show">
+  <div class="product-show__gallery">
+    <!-- ✅ Use the gallery partial so ALL photos show with thumbnails -->
+    <%- include('../shared/product_gallery', { item: product, images: imgs }) %>
+  </div>
+
+  <aside class="product-show__info">
+    <h1><%= product.title %></h1>
+    <p class="muted">SKU <%= product.sku %></p>
+
+    <div class="wishbar">
+      <form method="POST" action="/wishlist/toggle/<%= product._id %>">
+        <button type="submit"
+                class="heart-btn <%= wished ? 'is-active' : '' %>"
+                title="<%= wished ? 'Remove from wishlist' : 'Add to wishlist' %>">♥</button>
+      </form>
+      <div class="price-lg">₺ <%= Number(product.price || 0).toFixed(2) %></div>
+    </div>
+
+    <form method="POST" action="/cart/add/<%= product._id %>" class="hstack" style="gap:10px;">
+      <input type="number" name="qty" value="1" min="1" class="input" style="width:90px;">
       <button class="btn btn--brand" type="submit">Add to cart</button>
       <a class="btn" href="/products">Back to shop</a>
     </form>
-  </div>
+  </aside>
 </section>
 
-<section class="container" style="margin-top:28px;">
+<section class="block" style="margin-top:28px;">
   <h2>Reviews</h2>
   <p class="muted">No one has reviewed this product yet.</p>
 </section>

@@ -118,7 +118,6 @@
   const activeIn  = $('#active');
   const preview   = $('#previewLine');
 
-  // Formatters
   const fmtTRY = new Intl.NumberFormat('tr-TR', { style:'currency', currency:'TRY', minimumFractionDigits:2 });
 
   function toggleValueInput(){
@@ -126,11 +125,14 @@
     if (t === 'amount'){
       wrapAmt.style.display = '';
       wrapPct.style.display = 'none';
-      // move value to the visible input if needed
+      valAmt.disabled = false;
+      valPct.disabled = true;
       if (!valAmt.value && valPct.value){ valAmt.value = valPct.value; }
     } else {
       wrapPct.style.display = '';
       wrapAmt.style.display = 'none';
+      valPct.disabled = false;
+      valAmt.disabled = true;
       if (!valPct.value && valAmt.value){ valPct.value = valAmt.value; }
     }
     updatePreview();
@@ -154,7 +156,7 @@
       parts.push(value ? (value + '% off') : '% off');
     }
 
-    if (!isNaN(min) && min > 0) parts.push('min ' + fmtTRY.format(min));
+    if (!Number.isNaN(min) && min > 0) parts.push('min ' + fmtTRY.format(min));
     if (s || e) parts.push((s || 'now') + ' → ' + (e || 'no end'));
     parts.push(act ? 'Active' : 'Inactive');
 
@@ -167,7 +169,6 @@
     }
   }
 
-  // Events
   [typeSel, codeIn, valPct, valAmt, minSub, startIn, endIn, activeIn].forEach(el=>{
     el && el.addEventListener('input', function(){
       if (this === typeSel) toggleValueInput();
@@ -182,5 +183,6 @@
   updatePreview();
 })();
 </script>
+
 
 <%- include('../shared/footer') %>

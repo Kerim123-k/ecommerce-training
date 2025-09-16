@@ -1,22 +1,39 @@
 <%
   const it   = (typeof item !== 'undefined' && item) ? item : {};
-  const imgs = (Array.isArray(images) && images.length) ? images : (it.image ? [it.image] : []);
+  const raw  = (Array.isArray(images) && images.length) ? images : (it.image ? [it.image] : []);
+  const imgs = raw.filter(Boolean);
+
+  const titleSafe     = encodeURIComponent(it.title || 'Image');
+  const mainFallback  = `https://placehold.co/800x600/png?text=${titleSafe}`;
+  const thumbFallback = `https://placehold.co/160x120/png?text=${titleSafe}`;
 %>
 
 <div class="product-gallery">
   <div class="pg-main">
-    <% if (imgs.length) { %>
-      <img src="<%= imgs[0] %>" alt="<%= it.title || '' %>" loading="eager">
-    <% } else { %>
-      <img src="https://via.placeholder.com/800x600?text=No+Image" alt="">
-    <% } %>
+    <img
+      src="<%= imgs[0] || mainFallback %>"
+      alt="<%= it.title || '' %>"
+      loading="eager"
+      decoding="async"
+      referrerpolicy="no-referrer"
+      crossorigin="anonymous"
+      onerror="this.onerror=null; this.src='<%= mainFallback %>';"
+    >
   </div>
 
   <% if (imgs.length > 1) { %>
     <div class="pg-thumbs">
       <% imgs.forEach((src, i) => { %>
         <button type="button" class="pg-thumb <%= i === 0 ? 'is-active' : '' %>" data-src="<%= src %>">
-          <img src="<%= src %>" alt="" loading="lazy">
+          <img
+            src="<%= src %>"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            crossorigin="anonymous"
+            onerror="this.onerror=null; this.src='<%= thumbFallback %>';"
+          >
         </button>
       <% }) %>
     </div>
